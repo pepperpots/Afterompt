@@ -125,32 +125,34 @@ static inline am_timestamp_t am_ompt_now(void) {
 
 /* Push state on the state stack */
 static inline void am_ompt_push_state(struct am_ompt_thread_data* td,
-                                      am_timestamp_t tsc, uint64_t data) {
-  if (td->state_stack_top >= AM_OMPT_DEFAULT_MAX_STATE_STACK_ENTRIES) {
+                                      am_timestamp_t tsc,
+                                      union am_ompt_stack_item_data data) {
+  if (td->state_stack.top >= AM_OMPT_DEFAULT_MAX_STATE_STACK_ENTRIES) {
     fprintf(stderr, "Afterompt: Could not push state. \n");
     // TODO: Dying may be too radical
     exit(1);
   }
 
-  td->state_stack[td->state_stack_top].tsc = tsc;
-  td->state_stack[td->state_stack_top].data = data;
+  td->state_stack.stack[td->state_stack.top].tsc = tsc;
+  td->state_stack.stack[td->state_stack.top].data = data;
 
-  td->state_stack_top++;
+  td->state_stack.top++;
 }
 
 /* Pop state from the state stack */
-static inline struct am_ompt_stack am_ompt_pop_state(
+static inline struct am_ompt_stack_item am_ompt_pop_state(
     struct am_ompt_thread_data* td) {
-  if (td->state_stack_top == 0) {
+  if (td->state_stack.top == 0) {
     fprintf(stderr, "Afterompt: Could not pop state.\n");
     // TODO: Dying may be too radical
     exit(1);
   }
 
-  td->state_stack_top--;
+  td->state_stack.top--;
 
-  struct am_ompt_stack result = {td->state_stack[td->state_stack_top].tsc,
-                                 td->state_stack[td->state_stack_top].data};
+  struct am_ompt_stack_item result =
+                              {td->state_stack.stack[td->state_stack.top].tsc,
+                               td->state_stack.stack[td->state_stack.top].data};
 
   return result;
 }
@@ -176,7 +178,10 @@ void am_callback_thread_begin(ompt_thread_t type, ompt_data_t* data) {
     exit(1);
   }
 
-  am_ompt_push_state(td, am_ompt_now(), type);
+  union am_ompt_stack_item_data type_data;
+  type_data.thread_type = type;
+
+  am_ompt_push_state(td, am_ompt_now(), type_data);
 
   pthread_setspecific(am_thread_data_key, td);
 }
@@ -185,11 +190,11 @@ void am_callback_thread_end(ompt_data_t* data) {
   struct am_ompt_thread_data* td = am_get_thread_data();
   struct am_buffered_event_collection* c = td->event_collection;
 
-  struct am_ompt_stack state = am_ompt_pop_state(td);
+  struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
   struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-  struct am_dsk_openmp_thread t = {c->id, interval, state.data};
+  struct am_dsk_openmp_thread t = {c->id, interval, state.data.thread_type};
 
   am_dsk_openmp_thread_write_to_buffer_defid(&c->data, &t);
 
@@ -201,7 +206,9 @@ void am_callback_parallel_begin(ompt_data_t* task_data,
                                 ompt_data_t* parallel_data,
                                 unsigned int requested_parallelism, int flags,
                                 const void* codeptr_ra) {
-  am_ompt_push_state(am_get_thread_data(), am_ompt_now(), requested_parallelism);
+  union am_ompt_stack_item_data parallelism_data;
+  parallelism_data.requested_parallelism = requested_parallelism;
+  am_ompt_push_state(am_get_thread_data(), am_ompt_now(), parallelism_data);
 }
 
 void am_callback_parallel_end(ompt_data_t* parallel_data,
@@ -210,11 +217,12 @@ void am_callback_parallel_end(ompt_data_t* parallel_data,
   struct am_ompt_thread_data* td = am_get_thread_data();
   struct am_buffered_event_collection* c = td->event_collection;
 
-  struct am_ompt_stack state = am_ompt_pop_state(td);
+  struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
   struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-  struct am_dsk_openmp_parallel p = {c->id, interval, state.data, flags};
+  struct am_dsk_openmp_parallel p = {c->id, interval,
+                                     state.data.requested_parallelism, flags};
 
   am_dsk_openmp_parallel_write_to_buffer_defid(&c->data, &p);
 }
@@ -253,14 +261,17 @@ void am_callback_implicit_task(ompt_scope_endpoint_t endpoint,
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
-    am_ompt_push_state(td, am_ompt_now(), actual_parallelism);
+    union am_ompt_stack_item_data parallelism_data;
+    parallelism_data.actual_parallelism = actual_parallelism;
+    am_ompt_push_state(td, am_ompt_now(), parallelism_data);
   }
   else{
-    struct am_ompt_stack state = am_ompt_pop_state(td);
+    struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-    struct am_dsk_openmp_implicit_task it = {c->id, interval, state.data, flags};
+    struct am_dsk_openmp_implicit_task it = {c->id, interval,
+                               state.data.actual_parallelism, flags};
 
     am_dsk_openmp_implicit_task_write_to_buffer_defid(&c->data, &it);
   }
@@ -275,10 +286,11 @@ void am_callback_sync_region_wait(ompt_sync_region_t kind,
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
-    am_ompt_push_state(td, am_ompt_now(), 0);
+    union am_ompt_stack_item_data empty_data;
+    am_ompt_push_state(td, am_ompt_now(), empty_data);
   }
   else{
-    struct am_ompt_stack state = am_ompt_pop_state(td);
+    struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
@@ -328,14 +340,16 @@ void am_callback_work(ompt_work_t wstype, ompt_scope_endpoint_t endpoint,
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
-    am_ompt_push_state(td, am_ompt_now(), count);
+    union am_ompt_stack_item_data count_data;
+    count_data.count = count;
+    am_ompt_push_state(td, am_ompt_now(), count_data);
   }
   else{
-    struct am_ompt_stack state = am_ompt_pop_state(td);
+    struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-    struct am_dsk_openmp_work w = {c->id, interval, wstype, state.data};
+    struct am_dsk_openmp_work w = {c->id, interval, wstype, state.data.count};
 
     am_dsk_openmp_work_write_to_buffer_defid(&c->data, &w);
   }
@@ -348,10 +362,11 @@ void am_callback_master(ompt_scope_endpoint_t endpoint,
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
-    am_ompt_push_state(td, am_ompt_now(), 0);
+    union am_ompt_stack_item_data empty_data;
+    am_ompt_push_state(td, am_ompt_now(), empty_data);
   }
   else{
-    struct am_ompt_stack state = am_ompt_pop_state(td);
+    struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
@@ -369,10 +384,11 @@ void am_callback_sync_region(ompt_sync_region_t kind,
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
-    am_ompt_push_state(td, am_ompt_now(), 0);
+    union am_ompt_stack_item_data empty_data;
+    am_ompt_push_state(td, am_ompt_now(), empty_data);
   }
   else{
-    struct am_ompt_stack state = am_ompt_pop_state(td);
+    struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
@@ -431,10 +447,11 @@ void am_callback_nest_lock(ompt_scope_endpoint_t endpoint,
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
-    am_ompt_push_state(td, am_ompt_now(), 0);
+    union am_ompt_stack_item_data empty_data;
+    am_ompt_push_state(td, am_ompt_now(), empty_data);
   }
   else{
-    struct am_ompt_stack state = am_ompt_pop_state(td);
+    struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 

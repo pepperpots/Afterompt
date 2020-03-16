@@ -157,14 +157,14 @@ struct am_ompt_thread_data* am_ompt_create_thread_data(pthread_t tid) {
     goto out_err;
   }
 
-  if ((data->state_stack = malloc(sizeof(struct am_ompt_stack) *
+  if ((data->state_stack.stack = malloc(sizeof(struct am_ompt_stack_item) *
                                   AM_OMPT_DEFAULT_MAX_STATE_STACK_ENTRIES)) ==
       NULL) {
     fprintf(stderr, "Afterompt: Could not allocate memory for state stack\n");
     goto out_err_free;
   }
 
-  data->state_stack_top = 0;
+  data->state_stack.top = 0;
 
   if ((data->event_collection = am_ompt_create_event_collection(tid)) == NULL) {
     fprintf(stderr,
@@ -175,7 +175,7 @@ struct am_ompt_thread_data* am_ompt_create_thread_data(pthread_t tid) {
   return data;
 
 out_err_destroy:
-  free(data->state_stack);
+  free(data->state_stack.stack);
 out_err_free:
   free(data);
 out_err:
@@ -183,7 +183,7 @@ out_err:
 }
 
 void am_ompt_destroy_thread_data(struct am_ompt_thread_data* thread_data) {
-  free(thread_data->state_stack);
+  free(thread_data->state_stack.stack);
   free(thread_data);
 
   // TODO: Event collection is not free, so it can be dumped on exit.

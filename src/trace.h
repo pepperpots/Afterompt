@@ -30,17 +30,30 @@
 /* Application trace */
 extern struct am_buffered_trace am_ompt_trace;
 
+/* Event specific stack item data */
+union am_ompt_stack_item_data {
+  int32_t thread_type;
+  uint32_t requested_parallelism;
+  uint32_t actual_parallelism;
+  uint64_t count;
+};
+
+/* Single stack element for tracing states containing intervals */
+struct am_ompt_stack_item {
+  am_timestamp_t tsc;
+  union am_ompt_stack_item_data data;
+};
+
 /* Stack for tracing states containing intervals */
 struct am_ompt_stack {
-  am_timestamp_t tsc;
-  uint64_t data;
+  struct am_ompt_stack_item* stack;
+  uint32_t top;
 };
 
 /* Struct containing tracing information for a single thread */
 struct am_ompt_thread_data {
   struct am_buffered_event_collection* event_collection;
-  struct am_ompt_stack* state_stack;
-  uint32_t state_stack_top;
+  struct am_ompt_stack state_stack;
 };
 
 /*
