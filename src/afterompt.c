@@ -231,11 +231,15 @@ void am_callback_task_create(ompt_data_t* task_data,
                              const ompt_frame_t* task_frame,
                              ompt_data_t* new_task_data, int flags,
                              int has_dependences, const void* codeptr_ra) {
-  struct am_buffered_event_collection* c =
-      am_get_thread_data()->event_collection;
+  struct am_ompt_thread_data* tdata = am_get_thread_data();
 
-  struct am_dsk_openmp_task_create tc = {c->id, am_ompt_now(), flags,
-                                         has_dependences};
+  struct am_buffered_event_collection* c =
+      tdata->event_collection;
+
+  new_task_data->value = (tdata->tid << 32) | (tdata->unique_counter++);
+
+  struct am_dsk_openmp_task_create tc = {c->id, am_ompt_now(), new_task_data->value,
+                                         flags, has_dependences};
 
   am_dsk_openmp_task_create_write_to_buffer_defid(&c->data, &tc);
 }
@@ -246,8 +250,8 @@ void am_callback_task_schedule(ompt_data_t* prior_task_data,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_task_schedule ts = {c->id, am_ompt_now(),
-                                           prior_task_status};
+  struct am_dsk_openmp_task_schedule ts = {c->id, am_ompt_now(), prior_task_data->value,
+                                           next_task_data->value, prior_task_status};
 
   am_dsk_openmp_task_schedule_write_to_buffer_defid(&c->data, &ts);
 }
@@ -328,7 +332,8 @@ void am_callback_task_dependence(ompt_data_t* src_task_data,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_task_dependence td = {c->id, am_ompt_now()};
+  struct am_dsk_openmp_task_dependence td = {c->id, am_ompt_now(), src_task_data->value,
+                                             sink_task_data->value};
 
   am_dsk_openmp_task_dependence_write_to_buffer_defid(&c->data, &td);
 }

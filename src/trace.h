@@ -54,6 +54,8 @@ struct am_ompt_stack {
 struct am_ompt_thread_data {
   struct am_buffered_event_collection* event_collection;
   struct am_ompt_stack state_stack;
+  pthread_t tid;
+  uint32_t unique_counter;
 };
 
 /*

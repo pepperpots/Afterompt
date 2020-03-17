@@ -172,6 +172,9 @@ struct am_ompt_thread_data* am_ompt_create_thread_data(pthread_t tid) {
     goto out_err_destroy;
   }
 
+  data->tid = tid;
+  data->unique_counter = 0;
+
   return data;
 
 out_err_destroy:
