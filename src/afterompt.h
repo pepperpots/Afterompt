@@ -78,7 +78,7 @@ void am_callback_task_dependence(ompt_data_t* src_task_data,
 
 void am_callback_work(ompt_work_t wstype, ompt_scope_endpoint_t endpoint,
                       ompt_data_t* parallel_data, ompt_data_t* task_data,
-                      uint64_t count, const void* codeptr_ca);
+                      uint64_t count, const void* codeptr_ra);
 
 void am_callback_master(ompt_scope_endpoint_t endpoint,
                         ompt_data_t* parallel_data, ompt_data_t* taks_data,

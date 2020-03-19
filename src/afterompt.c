@@ -16,7 +16,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-// TODO: The root cause of that in Aftermath should be found
+// TODO: The root cause of that should be found in Aftermath.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Waddress-of-packed-member"
 
@@ -116,7 +116,7 @@ static inline am_timestamp_t am_ompt_now(void) {
     fprintf(
         stderr,
         "Afterompt: Local timestamp normalized to reference is negative.\n");
-    // TODO: Dying may be too radical
+    // TODO: Dying may be too radical.
     exit(1);
   }
 
@@ -129,7 +129,7 @@ static inline void am_ompt_push_state(struct am_ompt_thread_data* td,
                                       union am_ompt_stack_item_data data) {
   if (td->state_stack.top >= AM_OMPT_DEFAULT_MAX_STATE_STACK_ENTRIES) {
     fprintf(stderr, "Afterompt: Could not push state. \n");
-    // TODO: Dying may be too radical
+    // TODO: Dying may be too radical.
     exit(1);
   }
 
@@ -144,15 +144,15 @@ static inline struct am_ompt_stack_item am_ompt_pop_state(
     struct am_ompt_thread_data* td) {
   if (td->state_stack.top == 0) {
     fprintf(stderr, "Afterompt: Could not pop state.\n");
-    // TODO: Dying may be too radical
+    // TODO: Dying may be too radical.
     exit(1);
   }
 
   td->state_stack.top--;
 
-  struct am_ompt_stack_item result =
-                              {td->state_stack.stack[td->state_stack.top].tsc,
-                               td->state_stack.stack[td->state_stack.top].data};
+  struct am_ompt_stack_item result = {
+      td->state_stack.stack[td->state_stack.top].tsc,
+      td->state_stack.stack[td->state_stack.top].data};
 
   return result;
 }
@@ -162,7 +162,7 @@ static inline struct am_ompt_thread_data* am_get_thread_data() {
 
   if (!(td = pthread_getspecific(am_thread_data_key))) {
     fprintf(stderr, "Afterompt: Could not read thread data\n");
-    // TODO: Dying may be too radical
+    // TODO: Dying may be too radical.
     exit(1);
   }
 
@@ -174,10 +174,11 @@ void am_callback_thread_begin(ompt_thread_t type, ompt_data_t* data) {
 
   if (!(td = am_ompt_create_thread_data(pthread_self()))) {
     fprintf(stderr, "Afterompt: Could not create thread data\n");
-    // TODO: Dying may be too radical
+    // TODO: Dying may be too radical.
     exit(1);
   }
 
+  // TODO: Use initialization list.
   union am_ompt_stack_item_data type_data;
   type_data.thread_type = type;
 
@@ -206,6 +207,9 @@ void am_callback_parallel_begin(ompt_data_t* task_data,
                                 ompt_data_t* parallel_data,
                                 unsigned int requested_parallelism, int flags,
                                 const void* codeptr_ra) {
+  // TODO: task_frame and codeptr_ra data are not captured by the callback.
+  // TODO: Assign id to the parallel region and associated task.
+  // TODO: Use initialization list.
   union am_ompt_stack_item_data parallelism_data;
   parallelism_data.requested_parallelism = requested_parallelism;
   am_ompt_push_state(am_get_thread_data(), am_ompt_now(), parallelism_data);
@@ -214,6 +218,7 @@ void am_callback_parallel_begin(ompt_data_t* task_data,
 void am_callback_parallel_end(ompt_data_t* parallel_data,
                               ompt_data_t* task_data, int flags,
                               const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
   struct am_ompt_thread_data* td = am_get_thread_data();
   struct am_buffered_event_collection* c = td->event_collection;
 
@@ -231,15 +236,17 @@ void am_callback_task_create(ompt_data_t* task_data,
                              const ompt_frame_t* task_frame,
                              ompt_data_t* new_task_data, int flags,
                              int has_dependences, const void* codeptr_ra) {
+  // TODO: task_frame and codeptr_ra data are not captured by the callback.
+  // TODO: Capture id of the task that spawns the new task, so the execution
+  //       tree can be reconstructed.
   struct am_ompt_thread_data* tdata = am_get_thread_data();
 
-  struct am_buffered_event_collection* c =
-      tdata->event_collection;
+  struct am_buffered_event_collection* c = tdata->event_collection;
 
   new_task_data->value = (tdata->tid << 32) | (tdata->unique_counter++);
 
-  struct am_dsk_openmp_task_create tc = {c->id, am_ompt_now(), new_task_data->value,
-                                         flags, has_dependences};
+  struct am_dsk_openmp_task_create tc = {
+      c->id, am_ompt_now(), new_task_data->value, flags, has_dependences};
 
   am_dsk_openmp_task_create_write_to_buffer_defid(&c->data, &tc);
 }
@@ -250,8 +257,9 @@ void am_callback_task_schedule(ompt_data_t* prior_task_data,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_task_schedule ts = {c->id, am_ompt_now(), prior_task_data->value,
-                                           next_task_data->value, prior_task_status};
+  struct am_dsk_openmp_task_schedule ts = {
+      c->id, am_ompt_now(), prior_task_data->value, next_task_data->value,
+      prior_task_status};
 
   am_dsk_openmp_task_schedule_write_to_buffer_defid(&c->data, &ts);
 }
@@ -261,21 +269,24 @@ void am_callback_implicit_task(ompt_scope_endpoint_t endpoint,
                                ompt_data_t task_data,
                                unsigned int actual_parallelism,
                                unsigned int index, int flags) {
+  // TODO: Assign id the implicit task and associated parallel region.
+  //       Actually parallel region may have it id assigned by the
+  //       parallel region callback, so check first!
   struct am_ompt_thread_data* td = am_get_thread_data();
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
+    // TODO: Use initialization list.
     union am_ompt_stack_item_data parallelism_data;
     parallelism_data.actual_parallelism = actual_parallelism;
     am_ompt_push_state(td, am_ompt_now(), parallelism_data);
-  }
-  else{
+  } else {
     struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-    struct am_dsk_openmp_implicit_task it = {c->id, interval,
-                               state.data.actual_parallelism, flags};
+    struct am_dsk_openmp_implicit_task it = {
+        c->id, interval, state.data.actual_parallelism, flags};
 
     am_dsk_openmp_implicit_task_write_to_buffer_defid(&c->data, &it);
   }
@@ -286,14 +297,17 @@ void am_callback_sync_region_wait(ompt_sync_region_t kind,
                                   ompt_data_t* parallel_data,
                                   ompt_data_t* task_data,
                                   const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
+  // TODO: Task id can be capture to relate wait region with the task.
+  // TODO: Capture parallel region id as well.
   struct am_ompt_thread_data* td = am_get_thread_data();
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
+    // TODO: Use initialization list.
     union am_ompt_stack_item_data empty_data;
     am_ompt_push_state(td, am_ompt_now(), empty_data);
-  }
-  else{
+  } else {
     struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
@@ -306,6 +320,7 @@ void am_callback_sync_region_wait(ompt_sync_region_t kind,
 
 void am_callback_mutex_released(ompt_mutex_t kind, ompt_wait_id_t wait_id,
                                 const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
@@ -317,11 +332,12 @@ void am_callback_mutex_released(ompt_mutex_t kind, ompt_wait_id_t wait_id,
 
 void am_callback_dependences(ompt_data_t* task_data,
                              const ompt_dependence_t* deps, int ndeps) {
+  // TODO: Capture task id as well for this event.
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  /* We could collect more information here by traversing the deps
-     list to get the storage location of dependences. */
+  // TODO: We could collect more information here by traversing the deps
+  //       list to get the storage location of dependences.
   struct am_dsk_openmp_dependences d = {c->id, am_ompt_now(), ndeps};
 
   am_dsk_openmp_dependences_write_to_buffer_defid(&c->data, &d);
@@ -332,24 +348,28 @@ void am_callback_task_dependence(ompt_data_t* src_task_data,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_task_dependence td = {c->id, am_ompt_now(), src_task_data->value,
-                                             sink_task_data->value};
+  struct am_dsk_openmp_task_dependence td = {
+      c->id, am_ompt_now(), src_task_data->value, sink_task_data->value};
 
   am_dsk_openmp_task_dependence_write_to_buffer_defid(&c->data, &td);
 }
 
 void am_callback_work(ompt_work_t wstype, ompt_scope_endpoint_t endpoint,
                       ompt_data_t* parallel_data, ompt_data_t* task_data,
-                      uint64_t count, const void* codeptr_ca) {
+                      uint64_t count, const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
+  // TODO: Check when the region is generated for static loops, dynamic
+  //       loops and tasks.
+  // TODO: Capture task and parallel region id.
   struct am_ompt_thread_data* td = am_get_thread_data();
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
+    // TODO: Use initialization list.
     union am_ompt_stack_item_data count_data;
     count_data.count = count;
     am_ompt_push_state(td, am_ompt_now(), count_data);
-  }
-  else{
+  } else {
     struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
@@ -363,14 +383,17 @@ void am_callback_work(ompt_work_t wstype, ompt_scope_endpoint_t endpoint,
 void am_callback_master(ompt_scope_endpoint_t endpoint,
                         ompt_data_t* parallel_data, ompt_data_t* taks_data,
                         const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
+  // TODO: Capture id of the task and parallel region associated with master
+  //       region.
   struct am_ompt_thread_data* td = am_get_thread_data();
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
+    // TODO: Use initialization list.
     union am_ompt_stack_item_data empty_data;
     am_ompt_push_state(td, am_ompt_now(), empty_data);
-  }
-  else{
+  } else {
     struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
@@ -385,14 +408,16 @@ void am_callback_sync_region(ompt_sync_region_t kind,
                              ompt_scope_endpoint_t endpoint,
                              ompt_data_t* parallel_data, ompt_data_t* task_data,
                              const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
+  // TODO: Task and parallel id can be captured to relate region to the task.
   struct am_ompt_thread_data* td = am_get_thread_data();
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
+    // TODO: Use initialization list.
     union am_ompt_stack_item_data empty_data;
     am_ompt_push_state(td, am_ompt_now(), empty_data);
-  }
-  else{
+  } else {
     struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
@@ -405,6 +430,7 @@ void am_callback_sync_region(ompt_sync_region_t kind,
 
 void am_callback_lock_init(ompt_mutex_t kind, ompt_wait_id_t wait_id,
                            const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
@@ -415,6 +441,7 @@ void am_callback_lock_init(ompt_mutex_t kind, ompt_wait_id_t wait_id,
 
 void am_callback_lock_destroy(ompt_mutex_t kind, ompt_wait_id_t wait_id,
                               const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
@@ -426,6 +453,7 @@ void am_callback_lock_destroy(ompt_mutex_t kind, ompt_wait_id_t wait_id,
 void am_callback_mutex_acquire(ompt_mutex_t kind, unsigned int hint,
                                unsigned int impl, ompt_wait_id_t wait_id,
                                const void* codeptr_pa) {
+  // TODO: codeptr_ra data is not captured by the callback.
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
@@ -437,6 +465,7 @@ void am_callback_mutex_acquire(ompt_mutex_t kind, unsigned int hint,
 
 void am_callback_mutex_acquired(ompt_mutex_t kind, ompt_wait_id_t wait_id,
                                 const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
@@ -448,14 +477,15 @@ void am_callback_mutex_acquired(ompt_mutex_t kind, ompt_wait_id_t wait_id,
 
 void am_callback_nest_lock(ompt_scope_endpoint_t endpoint,
                            ompt_wait_id_t wait_id, const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback.
   struct am_ompt_thread_data* td = am_get_thread_data();
   struct am_buffered_event_collection* c = td->event_collection;
 
   if (endpoint == ompt_scope_begin) {
+    // TODO: Use initialization list.
     union am_ompt_stack_item_data empty_data;
     am_ompt_push_state(td, am_ompt_now(), empty_data);
-  }
-  else{
+  } else {
     struct am_ompt_stack_item state = am_ompt_pop_state(td);
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
@@ -467,6 +497,7 @@ void am_callback_nest_lock(ompt_scope_endpoint_t endpoint,
 }
 
 void am_callback_flush(ompt_data_t* thread_data, const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
@@ -477,6 +508,8 @@ void am_callback_flush(ompt_data_t* thread_data, const void* codeptr_ra) {
 
 void am_callback_cancel(ompt_data_t* task_data, int flags,
                         const void* codeptr_ra) {
+  // TODO: codeptr_ra data is not captured by the callback
+  // TODO: Task id can be captured to relate cancel event with the task
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
