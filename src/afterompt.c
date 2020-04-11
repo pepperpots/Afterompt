@@ -54,36 +54,60 @@ ompt_start_tool_result_t* ompt_start_tool(unsigned int omp_version,
   return &ompt_start_tool_result;
 }
 
-#define REGISTER_CALLBACK(name)                                          \
-  if (am_set_callback(ompt_##name, (ompt_callback_t)&am_##name) < 2) {   \
-    fprintf(stderr, "Afterompt: Callback %s seems to be unsupported!\n", \
-            #name);                                                      \
+#define REGISTER_CALLBACK(name)                                                          \
+  switch (am_set_callback(ompt_callback_##name, (ompt_callback_t)&am_callback_##name)) { \
+    case ompt_set_error:                                                                 \
+      fprintf(stderr, "Afterompt: Failed to set %s callback with an error!\n",           \
+              #name);                                                                    \
+      break;                                                                             \
+    case ompt_set_never:                                                                 \
+      fprintf(stderr, "Afterompt: Callback %s will never be invoked!\n",                 \
+              #name);                                                                    \
+      break;                                                                             \
+    case ompt_set_impossible:                                                            \
+      fprintf(stderr, "Afterompt: Callback %s may occur, but tracing is impossible!\n",  \
+              #name);                                                                    \
+      break;                                                                             \
+    case ompt_set_sometimes:                                                             \
+      fprintf(stderr, "Afterompt: Callback %s is only called sometimes!\n",              \
+              #name);                                                                    \
+      break;                                                                             \
+    case ompt_set_sometimes_paired:                                                      \
+      fprintf(stderr, "Afterompt: Callback %s is only called sometimes (paired)!\n",     \
+              #name);                                                                    \
+      break;                                                                             \
+    case ompt_set_always:                                                                \
+      break;                                                                             \
+    default:                                                                             \
+      fprintf(stderr, "Afterompt: ompt_set_callback for %s returned unexpected value!\n",\
+              #name);                                                                    \
+      break;                                                                             \
   }
 
 int ompt_initialize(ompt_function_lookup_t lookup, int num, ompt_data_t* data) {
   am_set_callback = (ompt_set_callback_t)lookup("ompt_set_callback");
 
-  REGISTER_CALLBACK(callback_thread_begin);
-  REGISTER_CALLBACK(callback_thread_end);
-  REGISTER_CALLBACK(callback_parallel_begin);
-  REGISTER_CALLBACK(callback_parallel_end);
-  REGISTER_CALLBACK(callback_implicit_task);
-  REGISTER_CALLBACK(callback_task_create);
-  REGISTER_CALLBACK(callback_task_schedule);
-  REGISTER_CALLBACK(callback_sync_region_wait);
-  REGISTER_CALLBACK(callback_mutex_released);
-  REGISTER_CALLBACK(callback_dependences);
-  REGISTER_CALLBACK(callback_task_dependence);
-  REGISTER_CALLBACK(callback_work);
-  REGISTER_CALLBACK(callback_master);
-  REGISTER_CALLBACK(callback_sync_region);
-  REGISTER_CALLBACK(callback_lock_init);
-  REGISTER_CALLBACK(callback_lock_destroy);
-  REGISTER_CALLBACK(callback_mutex_acquire);
-  REGISTER_CALLBACK(callback_mutex_acquired);
-  REGISTER_CALLBACK(callback_nest_lock);
-  REGISTER_CALLBACK(callback_flush);
-  REGISTER_CALLBACK(callback_cancel);
+  REGISTER_CALLBACK(thread_begin);
+  REGISTER_CALLBACK(thread_end);
+  REGISTER_CALLBACK(parallel_begin);
+  REGISTER_CALLBACK(parallel_end);
+  REGISTER_CALLBACK(implicit_task);
+  REGISTER_CALLBACK(task_create);
+  REGISTER_CALLBACK(task_schedule);
+  REGISTER_CALLBACK(sync_region_wait);
+  REGISTER_CALLBACK(mutex_released);
+  REGISTER_CALLBACK(dependences);
+  REGISTER_CALLBACK(task_dependence);
+  REGISTER_CALLBACK(work);
+  REGISTER_CALLBACK(master);
+  REGISTER_CALLBACK(sync_region);
+  REGISTER_CALLBACK(lock_init);
+  REGISTER_CALLBACK(lock_destroy);
+  REGISTER_CALLBACK(mutex_acquire);
+  REGISTER_CALLBACK(mutex_acquired);
+  REGISTER_CALLBACK(nest_lock);
+  REGISTER_CALLBACK(flush);
+  REGISTER_CALLBACK(cancel);
 
   am_timestamp_reference_init(&am_ompt_tsref, am_timestamp_now());
 
