@@ -30,12 +30,23 @@
 /* Application trace */
 extern struct am_buffered_trace am_ompt_trace;
 
+/* Struct for loop specific info */
+struct am_ompt_loop_info {
+  int flags;
+  int64_t lower_bound;
+  int64_t upper_bound;
+  int64_t increment;
+  int num_workers;
+  uint64_t codeptr_ra;
+};
+
 /* Event specific stack item data */
 union am_ompt_stack_item_data {
   int32_t thread_type;
   uint32_t requested_parallelism;
   uint32_t actual_parallelism;
   uint64_t count;
+  struct am_ompt_loop_info loop_info;
 };
 
 /* Single stack element for tracing states containing intervals */

@@ -110,3 +110,13 @@ void am_callback_flush(ompt_data_t* thread_data, const void* codeptr_ra);
 void am_callback_cancel(ompt_data_t* task_data, int flags,
                         const void* codeptr_ra);
 
+void am_callback_loop_begin(ompt_data_t* parallel_data, ompt_data_t* task_data,
+                            int flags, int64_t lower_bound, int64_t upper_bound,
+                            int64_t increment, int num_workers,
+                            void* codeptr_ra);
+
+void am_callback_loop_end(ompt_data_t* parallel_data, ompt_data_t* task_data);
+
+void am_callback_loop_chunk(ompt_data_t* parallel_data, ompt_data_t* task_data,
+                            int64_t lower_bound, int64_t upper_bound);
+

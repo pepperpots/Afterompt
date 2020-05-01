@@ -228,7 +228,9 @@ static int am_ompt_register_types() {
           &am_ompt_trace.data) ||
       am_dsk_openmp_nest_lock_write_default_id_to_buffer(&am_ompt_trace.data) ||
       am_dsk_openmp_flush_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_cancel_write_default_id_to_buffer(&am_ompt_trace.data)) {
+      am_dsk_openmp_cancel_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_openmp_loop_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_openmp_loop_chunk_write_default_id_to_buffer(&am_ompt_trace.data)) {
     return 1;
   }
 

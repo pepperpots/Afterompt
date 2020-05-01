@@ -32,7 +32,14 @@
 
 #include "afterompt.h"
 
-#define DEBUG_INFO 0
+// TODO: Move defines to a separate config file.
+#define TRACE_LOOPS 1
+
+#define TRACE_TASKS 1
+
+#define TRACE_OTHERS 0
+
+#define ALLOW_EXPERIMENTAL 1
 
 /* Time reference */
 static struct am_timestamp_reference am_ompt_tsref;
@@ -44,9 +51,7 @@ ompt_set_callback_t am_set_callback;
 
 ompt_start_tool_result_t* ompt_start_tool(unsigned int omp_version,
                                           const char* runtime_version) {
-#if DEBUG_INFO
   printf("%s (omp ver. %d)\n", runtime_version, omp_version);
-#endif
 
   static ompt_start_tool_result_t ompt_start_tool_result = {
       &ompt_initialize, &ompt_finalize, {}};
@@ -54,34 +59,40 @@ ompt_start_tool_result_t* ompt_start_tool(unsigned int omp_version,
   return &ompt_start_tool_result;
 }
 
-#define REGISTER_CALLBACK(name)                                                          \
-  switch (am_set_callback(ompt_callback_##name, (ompt_callback_t)&am_callback_##name)) { \
-    case ompt_set_error:                                                                 \
-      fprintf(stderr, "Afterompt: Failed to set %s callback with an error!\n",           \
-              #name);                                                                    \
-      break;                                                                             \
-    case ompt_set_never:                                                                 \
-      fprintf(stderr, "Afterompt: Callback %s will never be invoked!\n",                 \
-              #name);                                                                    \
-      break;                                                                             \
-    case ompt_set_impossible:                                                            \
-      fprintf(stderr, "Afterompt: Callback %s may occur, but tracing is impossible!\n",  \
-              #name);                                                                    \
-      break;                                                                             \
-    case ompt_set_sometimes:                                                             \
-      fprintf(stderr, "Afterompt: Callback %s is only called sometimes!\n",              \
-              #name);                                                                    \
-      break;                                                                             \
-    case ompt_set_sometimes_paired:                                                      \
-      fprintf(stderr, "Afterompt: Callback %s is only called sometimes (paired)!\n",     \
-              #name);                                                                    \
-      break;                                                                             \
-    case ompt_set_always:                                                                \
-      break;                                                                             \
-    default:                                                                             \
-      fprintf(stderr, "Afterompt: ompt_set_callback for %s returned unexpected value!\n",\
-              #name);                                                                    \
-      break;                                                                             \
+#define REGISTER_CALLBACK(name)                                                \
+  switch (am_set_callback(ompt_callback_##name,                                \
+                          (ompt_callback_t)&am_callback_##name)) {             \
+    case ompt_set_error:                                                       \
+      fprintf(stderr, "Afterompt: Failed to set %s callback with an error!\n", \
+              #name);                                                          \
+      break;                                                                   \
+    case ompt_set_never:                                                       \
+      fprintf(stderr, "Afterompt: Callback %s will never be invoked!\n",       \
+              #name);                                                          \
+      break;                                                                   \
+    case ompt_set_impossible:                                                  \
+      fprintf(                                                                 \
+          stderr,                                                              \
+          "Afterompt: Callback %s may occur, but tracing is impossible!\n",    \
+          #name);                                                              \
+      break;                                                                   \
+    case ompt_set_sometimes:                                                   \
+      fprintf(stderr, "Afterompt: Callback %s is only called sometimes!\n",    \
+              #name);                                                          \
+      break;                                                                   \
+    case ompt_set_sometimes_paired:                                            \
+      fprintf(stderr,                                                          \
+              "Afterompt: Callback %s is only called sometimes (paired)!\n",   \
+              #name);                                                          \
+      break;                                                                   \
+    case ompt_set_always:                                                      \
+      break;                                                                   \
+    default:                                                                   \
+      fprintf(                                                                 \
+          stderr,                                                              \
+          "Afterompt: ompt_set_callback for %s returned unexpected value!\n",  \
+          #name);                                                              \
+      break;                                                                   \
   }
 
 int ompt_initialize(ompt_function_lookup_t lookup, int num, ompt_data_t* data) {
@@ -89,15 +100,27 @@ int ompt_initialize(ompt_function_lookup_t lookup, int num, ompt_data_t* data) {
 
   REGISTER_CALLBACK(thread_begin);
   REGISTER_CALLBACK(thread_end);
+
+#if TRACE_LOOPS
+#if ALLOW_EXPERIMENTAL
+  REGISTER_CALLBACK(loop_begin);
+  REGISTER_CALLBACK(loop_end);
+  REGISTER_CALLBACK(loop_chunk);
+#endif
+#endif
+
+#if TRACE_TASKS
+  REGISTER_CALLBACK(task_create);
+  REGISTER_CALLBACK(task_schedule);
+  REGISTER_CALLBACK(task_dependence);
+#endif
+
+#if TRACE_OTHERS
   REGISTER_CALLBACK(parallel_begin);
   REGISTER_CALLBACK(parallel_end);
   REGISTER_CALLBACK(implicit_task);
-  REGISTER_CALLBACK(task_create);
-  REGISTER_CALLBACK(task_schedule);
-  REGISTER_CALLBACK(sync_region_wait);
   REGISTER_CALLBACK(mutex_released);
   REGISTER_CALLBACK(dependences);
-  REGISTER_CALLBACK(task_dependence);
   REGISTER_CALLBACK(work);
   REGISTER_CALLBACK(master);
   REGISTER_CALLBACK(sync_region);
@@ -108,6 +131,7 @@ int ompt_initialize(ompt_function_lookup_t lookup, int num, ompt_data_t* data) {
   REGISTER_CALLBACK(nest_lock);
   REGISTER_CALLBACK(flush);
   REGISTER_CALLBACK(cancel);
+#endif
 
   am_timestamp_reference_init(&am_ompt_tsref, am_timestamp_now());
 
@@ -260,9 +284,6 @@ void am_callback_task_create(ompt_data_t* task_data,
                              const ompt_frame_t* task_frame,
                              ompt_data_t* new_task_data, int flags,
                              int has_dependences, const void* codeptr_ra) {
-  // TODO: task_frame and codeptr_ra data are not captured by the callback.
-  // TODO: Capture id of the task that spawns the new task, so the execution
-  //       tree can be reconstructed.
   struct am_ompt_thread_data* tdata = am_get_thread_data();
 
   struct am_buffered_event_collection* c = tdata->event_collection;
@@ -270,7 +291,8 @@ void am_callback_task_create(ompt_data_t* task_data,
   new_task_data->value = (tdata->tid << 32) | (tdata->unique_counter++);
 
   struct am_dsk_openmp_task_create tc = {
-      c->id, am_ompt_now(), new_task_data->value, flags, has_dependences};
+      c->id, am_ompt_now(),   task_data->value,    new_task_data->value,
+      flags, has_dependences, (uint64_t)codeptr_ra};
 
   am_dsk_openmp_task_create_write_to_buffer_defid(&c->data, &tc);
 }
@@ -540,6 +562,71 @@ void am_callback_cancel(ompt_data_t* task_data, int flags,
   struct am_dsk_openmp_cancel cc = {c->id, am_ompt_now(), flags};
 
   am_dsk_openmp_cancel_write_to_buffer_defid(&c->data, &cc);
+}
+
+void am_callback_loop_begin(ompt_data_t* parallel_data, ompt_data_t* task_data,
+                            int flags, int64_t lower_bound, int64_t upper_bound,
+                            int64_t increment, int num_workers,
+                            void* codeptr_ra) {
+  struct am_ompt_thread_data* tdata = am_get_thread_data();
+
+  task_data->value = (tdata->tid << 32) | (tdata->unique_counter++);
+
+  union am_ompt_stack_item_data loop_info;
+
+  loop_info.loop_info.flags = flags;
+  loop_info.loop_info.lower_bound = lower_bound;
+  loop_info.loop_info.upper_bound = upper_bound;
+  loop_info.loop_info.increment = increment;
+  loop_info.loop_info.num_workers = num_workers;
+  loop_info.loop_info.codeptr_ra = (uint64_t)codeptr_ra;
+
+  am_ompt_push_state(am_get_thread_data(), am_ompt_now(), loop_info);
+}
+
+void am_callback_loop_end(ompt_data_t* parallel_data, ompt_data_t* task_data) {
+  struct am_ompt_thread_data* td = am_get_thread_data();
+  struct am_buffered_event_collection* c = td->event_collection;
+
+  struct am_ompt_stack_item state = am_ompt_pop_state(td);
+  struct am_ompt_loop_info loop_info = state.data.loop_info;
+
+  struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
+
+  struct am_dsk_openmp_loop l = {c->id,
+                                 interval,
+                                 task_data->value,
+                                 loop_info.flags,
+                                 loop_info.lower_bound,
+                                 loop_info.upper_bound,
+                                 loop_info.increment,
+                                 loop_info.num_workers,
+                                 loop_info.codeptr_ra};
+
+  am_dsk_openmp_loop_write_to_buffer_defid(&c->data, &l);
+
+  /* We need a marker in the trace to close the last period in the loop. Not
+     sure it is the best solution, so probably it needs to be revisited. */
+  // TODO: Revisit this later.
+  struct am_dsk_openmp_loop_chunk lc = {c->id, am_ompt_now(), task_data->value,
+                                        0, 0, 1};
+
+  am_dsk_openmp_loop_chunk_write_to_buffer_defid(&c->data, &lc);
+
+}
+
+void am_callback_loop_chunk(ompt_data_t* parallel_data, ompt_data_t* task_data,
+                            int64_t lower_bound, int64_t upper_bound) {
+  struct am_buffered_event_collection* c =
+      am_get_thread_data()->event_collection;
+
+  /* Zero indicates that it is not the end of the last period. This should be
+     treated as a small hack, since maybe there is a better solution. */
+  // TODO: Revisit this later.
+  struct am_dsk_openmp_loop_chunk lc = {c->id, am_ompt_now(), task_data->value,
+                                        lower_bound, upper_bound, 0};
+
+  am_dsk_openmp_loop_chunk_write_to_buffer_defid(&c->data, &lc);
 }
 
 #pragma clang pop
