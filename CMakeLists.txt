@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(afterompt VERSION 0.1.0 DESCRIPTION "OMPT tool for generating Aftermath traces")
+project(afterompt VERSION 0.2.0 DESCRIPTION "OMPT tool for generating Aftermath traces")
 
 find_package(PkgConfig)
 
