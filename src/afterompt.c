@@ -33,13 +33,13 @@
 #include "afterompt.h"
 
 // TODO: Move defines to a separate config file.
-#define TRACE_LOOPS 1
+#define TRACE_LOOPS 0
 
-#define TRACE_TASKS 1
+#define TRACE_TASKS 0
 
 #define TRACE_OTHERS 0
 
-#define ALLOW_EXPERIMENTAL 1
+#define ALLOW_EXPERIMENTAL 0
 
 /* Time reference */
 static struct am_timestamp_reference am_ompt_tsref;
