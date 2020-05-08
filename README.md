@@ -13,54 +13,79 @@ in the [OpenMP standard](https://www.openmp.org/specifications/)
 
 ## Available tracing information
 
-Currently the following information is traced and saved on the
-disk:
+Currently AfterOMPT traces the following states and events:
 
 ```
-am_dsk_openmp_thread,
-am_dsk_openmp_parallel,
-am_dsk_openmp_task_create,
-am_dsk_openmp_task_schedule,
-am_dsk_openmp_implicit_task,
-am_dsk_openmp_sync_region_wait,
-am_dsk_openmp_mutex_released,
-am_dsk_openmp_dependences,
-am_dsk_openmp_task_dependence,
-am_dsk_openmp_work,
-am_dsk_openmp_master,
-am_dsk_openmp_sync_region,
-am_dsk_openmp_lock_init,
-am_dsk_openmp_lock_destroy,
-am_dsk_openmp_mutex_acquire,
-am_dsk_openmp_mutex_acquired,
-am_dsk_openmp_nest_lock,
-am_dsk_openmp_flush,
-am_dsk_openmp_cancel
+openmp_thread,
+openmp_parallel,
+openmp_task_create,
+openmp_task_schedule,
+openmp_implicit_task,
+openmp_sync_region_wait,
+openmp_mutex_released,
+openmp_dependences,
+openmp_task_dependence,
+openmp_work,
+openmp_master,
+openmp_sync_region,
+openmp_lock_init,
+openmp_lock_destroy,
+openmp_mutex_acquire,
+openmp_mutex_acquired,
+openmp_nest_lock,
+openmp_flush,
+openmp_cancel
 ```
 
-Data above has corresponding in-memory representation in Aftermath that
-can be used to visualize and analyse the data. Please refer to Aftermath
-on disk data types definitions for detailed description of each state.
+And two attached to experimental non-standrd callbacks:
+
+```
+openmp_loop
+openmp_loop_chunk
+```
+
+Detailed information about data attached to each state
+and event can be found in the Aftermath types difinitions.
 
 ## Callbacks status
 
-To produced described tracing information the following
-callbacks were implemented:
+The following callbacks are implemented and compile-time
+switches were provided to allow selective tracing of the events.
+The switches are:
+`TRACE_LOOPS`, `TRACE_TASKS`, `TRACE_OTHERS`
+and can be enabled by passing `-DNAME=1` to CMake.
+
+Always enabled:
 
 * `ompt_callback_thread_begin`
 * `ompt_callback_thread_end`
+
+Enabled for `TRACE_LOOPS`:
+
+* `ompt_callback_loop_begin`
+* `ompt_callback_loop_end`
+* `ompt_callback_loop_chunk`
+
+(Currently to trace loops also `ALLOW_EXPERIMENTAL` has
+to be enabled, and the customized runtime is need)
+
+Enabled for `TRACE_TASKS`:
+
+* `ompt_callback_task_create`
+* `ompt_callback_task_schedule`
+* `ompt_callback_task_dependence`
+
+Enabled for `TRACE_OTHERS`:
+
 * `ompt_callback_parallel_begin`
 * `ompt_callback_parallel_end`
 * `ompt_callback_implicit_task`
 * `ompt_callback_work`
 * `ompt_callback_master`
 * `ompt_callback_sync_region`
-* `ompt_callback_task_create`
-* `ompt_callback_task_shcedule`
 * `ompt_callback_sync_region_wait`
 * `ompt_callback_mutex_released`
 * `ompt_callback_dependences`
-* `ompt_callback_task_dependence`
 * `ompt_callback_lock_init`
 * `ompt_callback_lock_destory`
 * `ompt_callback_mutex_acquire`
@@ -68,22 +93,6 @@ callbacks were implemented:
 * `ompt_callback_nest_lock`
 * `ompt_callback_flush`
 * `ompt_callback_cancel`
-
-The following callbacks are not implemented in LLVM
-(9.0.0, tag: llvmorg-9.0.0), so are subject of the
-future work:
-
-* `ompt_callback_target`
-* `ompt_callback_target_data_op`
-* `ompt_callback_target_submit`
-* `ompt_callback_control_tool`
-* `ompt_callback_device_initialize`
-* `ompt_callback_device_finalize`
-* `ompt_callback_device_load`
-* `ompt_callback_device_unload`
-* `ompt_callback_target_map`
-* `ompt_callback_reduction`
-* `ompt_callback_dispatch`
 
 ## Additional information
 
@@ -93,26 +102,18 @@ at. In the case of one-to-one mapping between cores and
 threads per worker traces can be treated as per core traces
 from the moment affinity of the thread was set.
 
-* It is assumed that states finish in the reverse order
-to their starting order. For example if B starts after A
-then B will finish before A. We also assume the state does
-NOT move between threads. It should be case for any
-standard constructs in OpenMP. This assumption allows
-handling of nested constructs with a single unified
-stack on every thread.
+* Only tied tasks are supported.
 
 ## Dependencies
 
-The tools was build and tested with following dependencies:
+The tools was build and tested with the following dependencies:
 
-* ubuntu 18.04 LTS
 * [aftermath](https://github.com/pepperpots/aftermath) (branch: afterompt-support)
 * [llvm-project](https://github.com/llvm/llvm-project) (tag: llvmorg-9.0.0)
-* clang (6.0.0-1ubuntu2)
+* [Clang](https://clang.llvm.org/) compiler
 
-However it should work with any major compiler and runtime,
-and operating system that support OMPT. Please note that
-default system package may be built with OMPT disabled.
+To enable loops tracing with experimental callbacks a custom runtime is needed
+and can be downloaded [here](https://github.com/pepperpots/llvm-project-openmp).
 
 ## Build
 
@@ -137,7 +138,7 @@ Then the library can be build and installed as follows:
 ```
 mkdir build
 cd build/
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=Release [CALLBACKS SWITCHES] ..
 make install
 ```
 
