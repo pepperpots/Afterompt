@@ -20,7 +20,10 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Waddress-of-packed-member"
 
+#define _GNU_SOURCE
+
 #include <pthread.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,6 +31,10 @@
 #include <aftermath/trace/on_disk_write_to_buffer.h>
 
 #include "trace.h"
+
+/* Maximum number of cores that can be traced */
+// TODO: Read number of cores from the system
+#define MAX_CORES 128
 
 /* Application trace */
 struct am_buffered_trace am_ompt_trace;
@@ -44,14 +51,15 @@ static size_t am_ompt_cbuf_size;
 /* Lock for trace-wide operations */
 static pthread_spinlock_t am_ompt_trace_lock;
 
+/* Mapping from the core number to the event collection id */
+static uint64_t event_collection_id_by_core[MAX_CORES];
+
 /* Create a new event collection and attach it to the trace */
 static struct am_buffered_event_collection* am_ompt_create_event_collection(
     pthread_t tid) {
   struct am_buffered_event_collection* c;
   am_event_collection_id_t id;
   struct am_dsk_event_collection dsk_ec;
-  struct am_dsk_hierarchy_node dsk_hn;
-  struct am_simple_hierarchy_node* hn;
   char name_buf[64];
 
   id = tid;
@@ -62,10 +70,6 @@ static struct am_buffered_event_collection* am_ompt_create_event_collection(
   dsk_ec.name.str = name_buf;
   dsk_ec.name.len = strlen(name_buf);
 
-  dsk_hn.parent_id = 1;
-  dsk_hn.name.str = name_buf;
-  dsk_hn.name.len = strlen(name_buf);
-
   if (!(c = malloc(sizeof(*c)))) {
     fprintf(stderr,
             "Afterompt: Could not allocate event "
@@ -73,17 +77,11 @@ static struct am_buffered_event_collection* am_ompt_create_event_collection(
     goto out_err;
   }
 
-  if (!(hn = malloc(sizeof(*hn)))) goto out_err_free_c;
-
-  if (!(hn->name = strdup(name_buf))) goto out_err_free_hn;
-
-  hn->first_child = NULL;
-
   if (am_buffered_event_collection_init(c, id, am_ompt_cbuf_size)) {
     fprintf(stderr,
             "Afterompt: Could not initialize event "
             "collection.\n");
-    goto out_err_free_hn_name;
+    goto out_err_free_c;
   }
 
   /* Use pthread lock rather than critical section to avoid
@@ -108,24 +106,6 @@ static struct am_buffered_event_collection* am_ompt_create_event_collection(
     goto out_err_unlock;
   }
 
-  hn->id = curr_hierarchy_node_id++;
-  dsk_hn.hierarchy_id = am_ompt_trace.hierarchies[0]->id;
-  dsk_hn.id = hn->id;
-
-  am_simple_hierarchy_node_add_child(am_ompt_trace.hierarchies[0]->root, hn);
-
-  if (am_dsk_hierarchy_node_write_to_buffer_defid(&am_ompt_trace.data,
-                                                  &dsk_hn)) {
-    am_simple_hierarchy_node_remove_first_child(
-        am_ompt_trace.hierarchies[0]->root);
-
-    fprintf(stderr,
-            "Afterompt: Could not trace hierrachy node "
-            "frame.\n");
-
-    goto out_err_unlock;
-  }
-
   if (pthread_spin_unlock(&am_ompt_trace_lock)) {
     fprintf(stderr, "Afterompt: Could not release the lock. \n");
     goto out_err_destroy;
@@ -139,10 +119,6 @@ out_err_unlock:
   }
 out_err_destroy:
   am_buffered_event_collection_destroy(c);
-out_err_free_hn_name:
-  free(hn->name);
-out_err_free_hn:
-  free(hn);
 out_err_free_c:
   free(c);
 out_err:
@@ -157,9 +133,9 @@ struct am_ompt_thread_data* am_ompt_create_thread_data(pthread_t tid) {
     goto out_err;
   }
 
-  if ((data->state_stack.stack = malloc(sizeof(struct am_ompt_stack_item) *
-                                  AM_OMPT_DEFAULT_MAX_STATE_STACK_ENTRIES)) ==
-      NULL) {
+  if ((data->state_stack.stack =
+           malloc(sizeof(struct am_ompt_stack_item) *
+                  AM_OMPT_DEFAULT_MAX_STATE_STACK_ENTRIES)) == NULL) {
     fprintf(stderr, "Afterompt: Could not allocate memory for state stack\n");
     goto out_err_free;
   }
@@ -186,6 +162,21 @@ out_err:
 }
 
 void am_ompt_destroy_thread_data(struct am_ompt_thread_data* thread_data) {
+  int core_number = sched_getcpu();
+
+  if (core_number >= MAX_CORES) {
+    fprintf(stderr,
+            "Afterompt: Event collection for core %d will be discarded. Please "
+            "increase MAX_CORES to fix this problem!\n",
+            core_number);
+  }
+
+  /* We assume that the core finishing the thread has done all the work on
+     that thread. It is true with 1-1 mapping between cores and threads.
+     The initial thread may move between cores, before OpenMP pins it, but
+     in that period no OpenMP work in executed. */
+  event_collection_id_by_core[core_number] = thread_data->event_collection->id;
+
   free(thread_data->state_stack.stack);
   free(thread_data);
 
@@ -230,7 +221,8 @@ static int am_ompt_register_types() {
       am_dsk_openmp_flush_write_default_id_to_buffer(&am_ompt_trace.data) ||
       am_dsk_openmp_cancel_write_default_id_to_buffer(&am_ompt_trace.data) ||
       am_dsk_openmp_loop_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_loop_chunk_write_default_id_to_buffer(&am_ompt_trace.data)) {
+      am_dsk_openmp_loop_chunk_write_default_id_to_buffer(
+          &am_ompt_trace.data)) {
     return 1;
   }
 
@@ -299,9 +291,56 @@ out_err:
 /* Writes an entry for each event collection to the trace buffer */
 static int am_ompt_trace_mappings() {
   struct am_dsk_event_mapping dsk_em;
+  /* Keep it before the loop to be able to do the goto error handling */
+  struct am_simple_hierarchy_node* hn;
 
-  for (size_t i = 0; i < am_ompt_trace.num_collections; i++) {
-    dsk_em.collection_id = am_ompt_trace.collections[i]->id;
+  for (size_t i = 0; i < MAX_CORES; i++) {
+    /* We assume unused elements are zero. It is true, because the array is
+       initialized as static. */
+    if (event_collection_id_by_core[i] == 0) continue;
+
+    struct am_dsk_hierarchy_node dsk_hn;
+    char name_buf[64];
+
+    snprintf(name_buf, sizeof(name_buf), "Core %zu", i);
+
+    dsk_hn.parent_id = 1;
+    dsk_hn.name.str = name_buf;
+    dsk_hn.name.len = strlen(name_buf);
+
+    if (!(hn = malloc(sizeof(*hn)))) {
+      fprintf(stderr,
+              "Afterompt: Failed to allocate an on-disk hierarchy node!\n");
+
+      goto err_out;
+    }
+
+    if (!(hn->name = strdup(name_buf))) {
+      fprintf(stderr,
+              "Afterompt: Failed to allocate an on-disk hierarchy node!\n");
+
+      goto err_out_free_hn;
+    }
+
+    hn->first_child = NULL;
+    hn->id = i + 2;
+
+    dsk_hn.hierarchy_id = am_ompt_trace.hierarchies[0]->id;
+    dsk_hn.id = hn->id;
+
+    am_simple_hierarchy_node_add_child(am_ompt_trace.hierarchies[0]->root, hn);
+
+    if (am_dsk_hierarchy_node_write_to_buffer_defid(&am_ompt_trace.data,
+                                                     &dsk_hn)) {
+      am_simple_hierarchy_node_remove_first_child(
+          am_ompt_trace.hierarchies[0]->root);
+
+      fprintf(stderr, "Afterompt: Could not write hierarchy node!\n");
+
+      goto err_out_free_hn;
+    }
+
+    dsk_em.collection_id = event_collection_id_by_core[i];
     dsk_em.hierarchy_id = 0;
     dsk_em.node_id = i + 2;
     dsk_em.interval.start = 0;
@@ -314,11 +353,17 @@ static int am_ompt_trace_mappings() {
               "mapping for event collection %u"
               " .\n",
               am_ompt_trace.collections[i]->id);
-      return 1;
+
+      goto err_out_free_hn;
     }
   }
 
   return 0;
+
+err_out_free_hn:
+  free(hn);
+err_out:
+  return 1;
 }
 
 void am_ompt_exit_trace() {
