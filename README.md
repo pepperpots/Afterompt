@@ -1,15 +1,106 @@
 # AfterOMPT
 
-OMPT tool for generating [Aftermath](https://www.aftermath-tracing.com/) traces.
-
-## Overview
-
 AfterOMPT is the OpenMP first-party tool that implements OMPT callbacks
 in order to track OpenMP events and to access the runtime state of the
 system. We use Aftermath tracing library to collect information about
 those events and save them to the trace file that can be later viewed
-using Aftermath GUI. Detailed information about OMPT can be found
-in the [OpenMP standard](https://www.openmp.org/specifications/)
+using [Aftermath](https://www.aftermath-tracing.com/) GUI. Detailed
+information about OMPT can be found in the [OpenMP standard](https://www.openmp.org/specifications/)
+
+## Related publications
+
+If you use this software in your research please cite us:
+
+```
+Work-in-progress
+```
+
+## Download
+
+The code can be simply cloned from our git repository:
+
+```
+git clone https://github.com/pepperpots/Afterompt.git
+```
+
+## Dependencies
+
+The only mandatory dependency is the Aftermath. The support for the OMPT types
+has not been merged into the main repository yet, but the required code can be
+accessed from our development fork in [here](https://github.com/pepperpots/aftermath)
+(branch: afterompt-support).
+
+To enable loops tracing with experimental callbacks a special custom version of
+Aftermath, LLVM OpenMP runtime and Clang are need. All details can be found in
+[this](https://github.com/IgWod/ompt-loops-tracing) repository.
+
+## Configuration
+
+Before running any commands please ensure that a required version of Aftermath
+has been built. For the building instruction please refer to the
+[official website](https://www.aftermath-tracing.com/prerelease/).
+
+
+The next step is to export required variables:
+
+```
+export CMAKE_PREFIX_PATH="<path-to-aftermath>/install"
+```
+
+Now the CMake project can be configured using following
+commands:
+
+```
+mkdir build
+cd build/
+cmake -DCMAKE_BUILD_TYPE=Release -DTRACE_X=TRUE ..
+```
+
+Where `-DTRACE_X=TRUE` enables a specific set of callbacks with allowed
+variables being: `TRACE_LOOPS`, `TRACE_TASKS`, `TRACE_OTHERS`. Experimental
+callbacks are enabled with `-DALLOW_EXPERIMENTAL=TRUE`. The scope of each
+variable is described later in this document.
+
+## Build
+
+Now the tools can be simply built by running the following command:
+
+```
+make install
+```
+
+The library is installed in the project's root inside `install/` directory.
+
+## Usage
+
+Now the tool can be used to trace any OpenMP application, as long as, OMPT
+compatible runtime is available in the system. The following instruction
+outlines one of the possible ways to use the tool:
+
+```
+export AFTEROMPT_LIBRARY_PATH="<path-to-afterompt>/install"
+
+source <path-to-aftermath>/env.sh
+
+clang -fopenmp -o omp-program omp-program.c
+
+AFTERMATH_TRACE_FILE=trace.ost \
+LD_PRELOAD=${AFTEROMPT_LIBRARY_PATH}/libafterompt.so \
+./omp-program
+```
+
+In the given example the tool is dynamically attached to the runtime by using
+the LD_PRELOAD variable.
+
+## Available environmental variables
+
+`AFTERMATH_TRACE_BUFFER_SIZE` (optional, default: 2^20) - Size of the trace wide
+buffer in bytes.
+
+`AFTERMATH_EVENT_COLLECTION_BUFFER_SIZE` (optional, default: 2^24) - Size of the per
+core buffer in bytes.
+
+`AFTERMATH_TRACE_FILE` (mandatory) - Name of the file where the data is written to.
 
 ## Available tracing information
 
@@ -37,7 +128,7 @@ openmp_flush,
 openmp_cancel
 ```
 
-And two attached to experimental non-standrd callbacks:
+And two provided by experimental non-standard callbacks:
 
 ```
 openmp_loop
@@ -45,15 +136,17 @@ openmp_loop_chunk
 ```
 
 Detailed information about data attached to each state
-and event can be found in the Aftermath types difinitions.
+and event can be found in the Aftermath types definitions.
+Some extra information (loop and task instances, iteration
+and task periods, etc.) is generated* when the trace is loaded
+and processed in the Aftermath GUI.
 
-## Callbacks status
+(*) Requires experimental Aftermath from [here](https://github.com/IgWod/ompt-loops-tracing)
+
+## Implemented callbacks
 
 The following callbacks are implemented and compile-time
 switches were provided to allow selective tracing of the events.
-The switches are:
-`TRACE_LOOPS`, `TRACE_TASKS`, `TRACE_OTHERS`
-and can be enabled by passing `-DNAME=1` to CMake.
 
 Always enabled:
 
@@ -96,75 +189,25 @@ Enabled for `TRACE_OTHERS`:
 
 ## Additional information
 
-* Tracing is done on per worker basis, in oppose to per
-core basis, so states are bound to the thread they happened
-at. In the case of one-to-one mapping between cores and
-threads per worker traces can be treated as per core traces
-from the moment affinity of the thread was set.
+* Tracing of untied tasks has not been tested
 
-* Only tied tasks are supported.
+## Supported software
 
-## Dependencies
+The library was currently tested with following versions of
+the software.
 
-The tools was build and tested with the following dependencies:
+Operating System:
 
-* [aftermath](https://github.com/pepperpots/aftermath) (branch: afterompt-support)
-* [llvm-project](https://github.com/llvm/llvm-project) (tag: llvmorg-9.0.0)
-* [Clang](https://clang.llvm.org/) compiler
+* Ubuntu 18.04 LTS (Kernel version 5.3)
+* Ubuntu 18.04 LTS (Kernel version 4.15)
 
-To enable loops tracing with experimental callbacks a custom runtime is needed
-and can be downloaded [here](https://github.com/pepperpots/llvm-project-openmp).
+Compilers:
 
-## Build
+* Clang 9.0.0
+* Clang 4.0.1
+* Intel Compiler 19.1.1
 
-Before building the library the [llvm project](https://github.com/llvm/llvm-project)
-and [aftermath](https://www.aftermath-tracing.com/prerelease/) have to be
-built. Instructions for that can be found at corresponding websites.
+OpenMP runtime:
 
-The next step is to export required variables:
-
-```
-export CMAKE_PREFIX_PATH="<path-to-aftermath>/install"
-
-export CC="clang"
-export CXX="clang++"
-
-export C_INCLUDE_PATH="<path-to-llvm-project>/install/lib/clang/9.0.0/include"
-export CXX_INCLUDE_PATH="<path-to-llvm-project>/install/lib/clang/9.0.0/include"
-```
-
-Then the library can be build and installed as follows:
-
-```
-mkdir build
-cd build/
-cmake -DCMAKE_BUILD_TYPE=Release [CALLBACKS SWITCHES] ..
-make install
-```
-
-The library is installed in the project's root inside `install/` directory.
-
-## Usage
-
-Any OpenMP application can be run with tool attached to it generate
-Aftermath traces. The following instruction outlines one of the
-possible ways to do it:
-
-```
-export AFTEROMPT_LIBRARY_PATH="<path-to-afterompt>/install"
-export LLVM_LIBRARY_PATH="<path-to-llvm-project>/install/lib"
-
-source <path-to-aftermath>/env.sh
-
-clang -fopenmp -o omp-program omp-program.c
-
-AFTERMATH_TRACE_FILE=trace.ost \
-LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LLVM_LIBRARY_PATH}:${AFTEROMPT_LIB_PATH} \
-LD_PRELOAD=${LLVM_LIBRARY_PATH}/libomp.so:${AFTEROMPT_LIBRARY_PATH}/libafterompt.so \
-./omp-program
-```
-
-In the given example the tool is dynamically attached to the runtime by using
-the LD_PRELOAD variable. The LLVM runtime is also pre-loaded to ensure
-that the system runtime is not used.
-
+* LLVM 9.0.0
+* Intel Runtime 19.1.1
