@@ -14,6 +14,22 @@ set(SOURCES
     "src/trace.c"
 )
 
+if(${TRACE_LOOPS})
+  add_definitions(-DTRACE_LOOPS)
+endif()
+
+if(${TRACE_TASKS})
+  add_definitions(-DTRACE_TASKS)
+endif()
+
+if(${TRACE_OTHERS})
+  add_definitions(-DTRACE_OTHERS)
+endif()
+
+if(${ALLOW_EXPERIMENTAL})
+  add_definitions(-DALLOW_EXPERIMENTAL)
+endif()
+
 link_directories(${LIBTRACE_LIBRARY_DIRS})
 
 add_library(${CMAKE_PROJECT_NAME} SHARED ${SOURCES})

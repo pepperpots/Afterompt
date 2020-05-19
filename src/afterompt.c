@@ -32,15 +32,6 @@
 
 #include "afterompt.h"
 
-// TODO: Move defines to a separate config file.
-#define TRACE_LOOPS 0
-
-#define TRACE_TASKS 0
-
-#define TRACE_OTHERS 0
-
-#define ALLOW_EXPERIMENTAL 0
-
 /* Time reference */
 static struct am_timestamp_reference am_ompt_tsref;
 
@@ -101,21 +92,21 @@ int ompt_initialize(ompt_function_lookup_t lookup, int num, ompt_data_t* data) {
   REGISTER_CALLBACK(thread_begin);
   REGISTER_CALLBACK(thread_end);
 
-#if TRACE_LOOPS
-#if ALLOW_EXPERIMENTAL
+#ifdef TRACE_LOOPS
+#ifdef ALLOW_EXPERIMENTAL
   REGISTER_CALLBACK(loop_begin);
   REGISTER_CALLBACK(loop_end);
   REGISTER_CALLBACK(loop_chunk);
 #endif
 #endif
 
-#if TRACE_TASKS
+#ifdef TRACE_TASKS
   REGISTER_CALLBACK(task_create);
   REGISTER_CALLBACK(task_schedule);
   REGISTER_CALLBACK(task_dependence);
 #endif
 
-#if TRACE_OTHERS
+#ifdef TRACE_OTHERS
   REGISTER_CALLBACK(parallel_begin);
   REGISTER_CALLBACK(parallel_end);
   REGISTER_CALLBACK(implicit_task);
