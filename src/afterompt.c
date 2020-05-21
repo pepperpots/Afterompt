@@ -281,8 +281,10 @@ void am_callback_task_create(ompt_data_t* task_data,
 
   new_task_data->value = (tdata->tid << 32) | (tdata->unique_counter++);
 
+  uint64_t current_task_id = (task_data == NULL) ? 0 : task_data->value;
+
   struct am_dsk_openmp_task_create tc = {
-      c->id, am_ompt_now(),   task_data->value,    new_task_data->value,
+      c->id, am_ompt_now(),   current_task_id,    new_task_data->value,
       flags, has_dependences, (uint64_t)codeptr_ra};
 
   am_dsk_openmp_task_create_write_to_buffer_defid(&c->data, &tc);
