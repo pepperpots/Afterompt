@@ -1,4 +1,4 @@
-# AfterOMPT
+![Logo](/docs/afterompt.png)
 
 AfterOMPT is the OpenMP first-party tool that implements OMPT callbacks
 in order to track OpenMP events and to access the runtime state of the
