@@ -1,23 +1,13 @@
 ![Logo](/docs/afterompt.png)
 
-AfterOMPT is the OpenMP first-party tool that implements OMPT callbacks
-in order to track OpenMP events and to access the runtime state of the
-system. We use Aftermath tracing library to collect information about
-those events and save them to the trace file that can be later viewed
-using [Aftermath](https://www.aftermath-tracing.com/) GUI. Detailed
-information about OMPT can be found in the [OpenMP standard](https://www.openmp.org/specifications/)
-
-## Related publications
-
-If you use this software in your research please cite us:
-
-```
-Work-in-progress
-```
+AfterOMPT is a library that implements [OMPT](https://www.openmp.org/specifications/)
+callbacks to collect dynamic events from OpenMP applications, and to write
+them to a trace file using the [Aftermath](https://www.aftermath-tracing.com/)
+tracing API.
 
 ## Download
 
-The code can be simply cloned from our git repository:
+The code can be simply downloaded from our git repository:
 
 ```
 git clone https://github.com/pepperpots/Afterompt.git
@@ -25,13 +15,13 @@ git clone https://github.com/pepperpots/Afterompt.git
 
 ## Dependencies
 
-The only mandatory dependency is the Aftermath. The support for the OMPT types
-has not been merged into the main repository yet, but the required code can be
-accessed from our development fork in [here](https://github.com/pepperpots/aftermath)
+The only dependency for the project is [Aftermath](https://www.aftermath-tracing.com/).
+The support for the OMPT events has not been merged into the main repository yet,
+however the required code can be found in our development fork in [here](https://github.com/pepperpots/aftermath)
 (branch: afterompt-support).
 
-To enable loops tracing with experimental callbacks a special custom version of
-Aftermath, LLVM OpenMP runtime and Clang are need. All details can be found in
+To enable loops tracing that relay on experimental callbacks modified versions of
+Aftermath, LLVM OpenMP runtime and Clang are needed. All details can be found in
 [this](https://github.com/IgWod/ompt-loops-tracing) repository.
 
 ## Configuration
@@ -40,22 +30,18 @@ Before running any commands please ensure that a required version of Aftermath
 has been built. For the building instruction please refer to the
 [official website](https://www.aftermath-tracing.com/prerelease/).
 
+It is assumed that the OMPT compatible OpenMP runtime is already installed in the
+system. If not runtime is present we recommend building and installing the
+[LLVM OpenMP runtime](https://github.com/llvm/llvm-project) from source.
 
-The next step is to export required variables:
+Now `CMAKE_PREFIX_PATH` has to be exported, so CMake can find required Aftermath
+libraries.
 
 ```
 export CMAKE_PREFIX_PATH="<path-to-aftermath>/install"
 ```
 
-If the `ompt.h` header cannot be found the location should be added to the
-include path:
-
-```
-export C_INCLUDE_PATH="/home/iwodiany/Projects/llvm-project/openmp/build/instal/usr/local/include"
-```
-
-Now the CMake project can be configured using following
-commands:
+Now the Makefiles can be generated using following commands:
 
 ```
 mkdir build
@@ -63,12 +49,12 @@ cd build/
 cmake -DCMAKE_BUILD_TYPE=Release -DTRACE_X=TRUE ..
 ```
 
-Where `-DTRACE_X=TRUE` enables a specific set of callbacks with allowed
-variables being: `TRACE_LOOPS`, `TRACE_TASKS`, `TRACE_OTHERS`. Experimental
+Where `-DTRACE_X=TRUE` enables a specific set of callbacks. Allowed
+options are: `TRACE_LOOPS`, `TRACE_TASKS` and `TRACE_OTHERS`. Experimental
 callbacks are enabled with `-DALLOW_EXPERIMENTAL=TRUE`. The scope of each
-variable is described later in this document.
+options is described later in this document.
 
-Example:
+Example CMake command:
 
 ```
 cmake -DCMAKE_BUILD_TYPE=Release -DTRACE_TASKS=TURE -DTRACE_OTHERS=TRUE ..
@@ -76,19 +62,26 @@ cmake -DCMAKE_BUILD_TYPE=Release -DTRACE_TASKS=TURE -DTRACE_OTHERS=TRUE ..
 
 ## Build
 
-Now the tool can be simply built by running the following command:
+Now the tool can be simply built by running the `make` command:
 
 ```
 make install
 ```
 
-The library is installed in the project's root inside `install/` directory.
+The library is installed in the project's root inside the `install/` directory.
+
+If the `ompt.h` header cannot be found by the compiler, its location should be
+added to the include path:
+
+```
+export C_INCLUDE_PATH="/home/iwodiany/Projects/llvm-project/openmp/build/instal/usr/local/include"
+```
 
 ## Usage
 
-Now the tool can be used to trace any OpenMP application, as long as, OMPT
-compatible runtime is available in the system. The following instruction
-outlines one of the possible ways to use the tool:
+Now the tool can be used to trace any OpenMP applications, as long as, OMPT
+compatible runtime is available in the system. The following instructions
+outlines one of the possible ways to do it:
 
 ```
 export AFTEROMPT_LIBRARY_PATH="<path-to-afterompt>/install"
@@ -104,10 +97,14 @@ LD_PRELOAD=${AFTEROMPT_LIBRARY_PATH}/libafterompt.so \
 ```
 
 In the given example the tool is dynamically attached to the runtime by using
-the `LD_PRELOAD` variable. `LD_LIBRARY_PATH` is not required, however it helps
-to ensure the correct version of the runtime is used.
+the `LD_PRELOAD` variable. `LD_LIBRARY_PATH` is not required, however it allows
+the application to use the correct runtime, if multiple are available in the system,
+or the search path has not been set when the runtime was installed.
 
 ## Available environmental variables
+
+The following environmental variables can be exported to change specific
+parameters of the library:
 
 `AFTERMATH_TRACE_BUFFER_SIZE` (optional, default: 2^20) - Size of the trace wide
 buffer in bytes.
@@ -143,7 +140,7 @@ openmp_flush,
 openmp_cancel
 ```
 
-And two provided by experimental non-standard callbacks:
+Additional two are provided by experimental non-standard callbacks:
 
 ```
 openmp_loop
@@ -152,8 +149,8 @@ openmp_loop_chunk
 
 Detailed information about data attached to each state
 and event can be found in the Aftermath types definitions.
-Some extra information (loop and task instances, iteration
-and task periods, etc.) is generated* when the trace is loaded
+Some extra information such as: loop and task instances, iteration
+and task periods, etc. can be generated* when the trace is loaded
 and processed in the Aftermath GUI.
 
 (*) Requires experimental Aftermath from [here](https://github.com/IgWod/ompt-loops-tracing)
@@ -174,8 +171,9 @@ Enabled for `TRACE_LOOPS`:
 * `ompt_callback_loop_end`
 * `ompt_callback_loop_chunk`
 
-(Currently to trace loops also `ALLOW_EXPERIMENTAL` has
-to be enabled, and the customized runtime is need)
+(Currently to trace loops `ALLOW_EXPERIMENTAL` has
+to be enabled as well, and the customized compiler
+and runtime have to be installed)
 
 Enabled for `TRACE_TASKS`:
 
@@ -204,25 +202,33 @@ Enabled for `TRACE_OTHERS`:
 
 ## Additional information
 
-* Tracing of untied tasks has not been tested
+* Tracing of untied tasks has not been tested.
+
+* One-to-one mapping between threads and cores is assumed, so that
+  at most one worker thread can be attached to each core. Please
+  refer to affinity settings of your runtime to ensure this behaviour.
 
 ## Supported software
 
-The library was currently tested with following versions of
-the software.
+The library was successfully used with following versions of the software:
 
-Operating System:
+| Operating System                       | Compiler                | Runtime      |
+| -------------------------------------- | ----------------------- | ------------ |
+| Ubuntu 18.04 LTS (Kernel version 5.3)  | Clang 9.0.0             | LLVM 9.0     |
+| Ubuntu 18.04 LTS (Kernel version 4.15) | Clang 4.0.0             | Intel 19.1.1 |
+|                                        | Intel C Compiler 19.1.1 |              |
 
-* Ubuntu 18.04 LTS (Kernel version 5.3)
-* Ubuntu 18.04 LTS (Kernel version 4.15)
+## Publications
 
-Compilers:
+To cite this project please use the following BibTeX entry:
 
-* Clang 9.0.0
-* Clang 4.0.1
-* Intel Compiler 19.1.1
+```
+Work-in-progress
+```
 
-OpenMP runtime:
+## Contributors
 
-* LLVM 9.0.0
-* Intel Runtime 19.1.1
+Igor Wodiany, Andi Drebes, Richard Neil, Antoniu Pop
+
+For any problems or questions please contact Igor at
+firstname.lastname@manchester.ac.uk.
