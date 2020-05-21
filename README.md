@@ -47,6 +47,13 @@ The next step is to export required variables:
 export CMAKE_PREFIX_PATH="<path-to-aftermath>/install"
 ```
 
+If the `ompt.h` header cannot be found the location should be added to the
+include path:
+
+```
+export C_INCLUDE_PATH="/home/iwodiany/Projects/llvm-project/openmp/build/instal/usr/local/include"
+```
+
 Now the CMake project can be configured using following
 commands:
 
@@ -61,9 +68,15 @@ variables being: `TRACE_LOOPS`, `TRACE_TASKS`, `TRACE_OTHERS`. Experimental
 callbacks are enabled with `-DALLOW_EXPERIMENTAL=TRUE`. The scope of each
 variable is described later in this document.
 
+Example:
+
+```
+cmake -DCMAKE_BUILD_TYPE=Release -DTRACE_TASKS=TURE -DTRACE_OTHERS=TRUE ..
+```
+
 ## Build
 
-Now the tools can be simply built by running the following command:
+Now the tool can be simply built by running the following command:
 
 ```
 make install
@@ -79,10 +92,11 @@ outlines one of the possible ways to use the tool:
 
 ```
 export AFTEROMPT_LIBRARY_PATH="<path-to-afterompt>/install"
+export LD_LIBRARY_PATH="<path-to-openmp-runtime":${LD_LIBRARY_PATH}
 
 source <path-to-aftermath>/env.sh
 
-clang -fopenmp -o omp-program omp-program.c
+clang -o omp-program -fopenmp omp-program.c
 
 AFTERMATH_TRACE_FILE=trace.ost \
 LD_PRELOAD=${AFTEROMPT_LIBRARY_PATH}/libafterompt.so \
@@ -90,7 +104,8 @@ LD_PRELOAD=${AFTEROMPT_LIBRARY_PATH}/libafterompt.so \
 ```
 
 In the given example the tool is dynamically attached to the runtime by using
-the LD_PRELOAD variable.
+the `LD_PRELOAD` variable. `LD_LIBRARY_PATH` is not required, however it helps
+to ensure the correct version of the runtime is used.
 
 ## Available environmental variables
 
