@@ -14,21 +14,27 @@ set(SOURCES
     "src/trace.c"
 )
 
-if(${TRACE_LOOPS})
-  add_definitions(-DTRACE_LOOPS)
+set(COMPILER_DEFS
+    ""
+)
+
+if(TRACE_LOOPS)
+  set(COMPILER_DEFS "${COMPILER_DEFS} -DTRACE_LOOPS")
 endif()
 
-if(${TRACE_TASKS})
-  add_definitions(-DTRACE_TASKS)
+if(TRACE_TASKS)
+  set(COMPILER_DEFS "${COMPILER_DEFS} -DTRACE_TASKS")
 endif()
 
-if(${TRACE_OTHERS})
-  add_definitions(-DTRACE_OTHERS)
+if(TRACE_OTHERS)
+  set(COMPILER_DEFS "${COMPILER_DEFS} -DTRACE_OTHERS")
 endif()
 
-if(${ALLOW_EXPERIMENTAL})
-  add_definitions(-DALLOW_EXPERIMENTAL)
+if(ALLOW_EXPERIMENTAL)
+  set(COMPILER_DEFS "${COMPILER_DEFS} -DALLOW_EXPERIMENTAL")
 endif()
+
+add_definitions(${COMPILER_DEFS})
 
 link_directories(${LIBTRACE_LIBRARY_DIRS})
 
