@@ -139,8 +139,17 @@ struct am_ompt_thread_data* am_ompt_create_thread_data(pthread_t tid) {
     fprintf(stderr, "Afterompt: Could not allocate memory for state stack\n");
     goto out_err_free;
   }
-
   data->state_stack.top = 0;
+
+#ifdef SUPPORT_TRACE_CALLSTACK
+  if ((data->call_stack.stack =
+           malloc(sizeof(struct am_ompt_stack_item) *
+                  AM_OMPT_DEFAULT_MAX_CALL_STACK_ENTRIES)) == NULL) {
+    fprintf(stderr, "Afterompt: Could not allocate memory for call stack\n");
+    goto out_err_free;
+  }
+  data->call_stack.top = 0;
+#endif
 
   if ((data->event_collection = am_ompt_create_event_collection(tid)) == NULL) {
     fprintf(stderr,
@@ -178,6 +187,9 @@ void am_ompt_destroy_thread_data(struct am_ompt_thread_data* thread_data) {
   event_collection_id_by_core[core_number] = thread_data->event_collection->id;
 
   free(thread_data->state_stack.stack);
+#ifdef SUPPORT_TRACE_CALLSTACK
+  free(thread_data->call_stack.stack);
+#endif
   free(thread_data);
 
   // TODO: Event collection is not free, so it can be dumped on exit.
@@ -221,6 +233,9 @@ static int am_ompt_register_types() {
       am_dsk_openmp_flush_write_default_id_to_buffer(&am_ompt_trace.data) ||
       am_dsk_openmp_cancel_write_default_id_to_buffer(&am_ompt_trace.data) ||
       am_dsk_openmp_loop_write_default_id_to_buffer(&am_ompt_trace.data) ||
+#ifdef SUPPORT_TRACE_CALLSTACK
+      am_dsk_stack_frame_write_default_id_to_buffer(&am_ompt_trace.data) ||
+#endif
       am_dsk_openmp_loop_chunk_write_default_id_to_buffer(
           &am_ompt_trace.data)) {
     return 1;

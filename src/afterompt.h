@@ -120,3 +120,20 @@ void am_callback_loop_end(ompt_data_t* parallel_data, ompt_data_t* task_data);
 void am_callback_loop_chunk(ompt_data_t* parallel_data, ompt_data_t* task_data,
                             int64_t lower_bound, int64_t upper_bound);
 
+/* Function instrumentation calls:
+ * May be inserted statically by compiler or dynamically (e.g. via Pin DBI)
+ */
+
+void am_function_entry(void* addr, int start_trace_signal);
+
+void am_function_exit(void* addr, int stop_trace_signal);
+
+/* Custom definitions of the compiler-inserted calls for function
+*  instrumentation
+*/
+
+void __cyg_profile_func_enter(void *func,  void *caller)
+	 __attribute__((no_instrument_function));
+
+void __cyg_profile_func_exit(void *func,  void *caller)
+	 __attribute__((no_instrument_function));

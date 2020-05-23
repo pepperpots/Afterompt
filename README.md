@@ -200,6 +200,28 @@ Enabled for `TRACE_OTHERS`:
 * `ompt_callback_flush`
 * `ompt_callback_cancel`
 
+## Call-stack tracing
+
+A further compile-time switch enables the library to expose
+call-stack instrumentation functions for the target OpenMP program:
+
+`SUPPORT_TRACE_CALLSTACK`
+
+Once enabled, the library will support the tracing of function calls. For
+instrumented functions, the trace will record the thread associated with the
+call, the address of the function in the symbol table, and the interval that
+the associated frame was on the stack.
+
+Note: the library can support call-stack instrumentation, but does not
+implement it. Implementing call-stack instrumentation may be done via (for
+example):
+
+* Compiling the target OpenMP program with compiler-inserted instrumentation
+calls via `-finstrument-functions`. This is currently supported out-of-the-box.
+* Inserting the instrumentation calls dynamically using
+dynamic-binary-instrumentation. An Intel [PinTool](https://software.intel.com/content/www/us/en/develop/articles/pin-a-dynamic-binary-instrumentation-tool.html)
+to implement this is forthcoming.
+
 ## Additional information
 
 * Tracing of untied tasks has not been tested.

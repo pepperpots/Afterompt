@@ -38,6 +38,11 @@ static struct am_timestamp_reference am_ompt_tsref;
 /* Pthread key to access thread tracing data */
 static pthread_key_t am_thread_data_key;
 
+#ifdef SUPPORT_TRACE_CALLSTACK
+/* If 1, then we are within region of interest for function tracing */
+static int call_stack_tracing = 0;
+#endif
+
 ompt_set_callback_t am_set_callback;
 
 ompt_start_tool_result_t* ompt_start_tool(unsigned int omp_version,
@@ -199,13 +204,58 @@ static inline struct am_ompt_stack_item am_ompt_pop_state(
   return result;
 }
 
+#ifdef SUPPORT_TRACE_CALLSTACK
+/* Push frame on the call stack */
+static inline void am_ompt_push_call_stack_frame(struct am_ompt_thread_data* td,
+                                      am_timestamp_t tsc,
+                                      union am_ompt_stack_item_data data) {
+  if (td->call_stack.top >= AM_OMPT_DEFAULT_MAX_CALL_STACK_ENTRIES) {
+    fprintf(stderr, "Afterompt: Could not push stack frame. \n");
+    // TODO: Dying may be too radical
+    exit(1);
+  }
+
+  td->call_stack.stack[td->call_stack.top].tsc = tsc;
+  td->call_stack.stack[td->call_stack.top].data = data;
+
+  td->call_stack.top++;
+}
+
+/* Pop frame from the call stack */
+static inline struct am_ompt_stack_item am_ompt_pop_call_stack_frame(
+    struct am_ompt_thread_data* td) {
+
+	// We may have entered a function before the am thread data structures were set up
+	// meaning we didn't push it to any stack
+	// So we expect to fail the pop
+  if (td->call_stack.top == 0) {
+		union am_ompt_stack_item_data dummy_data;
+		dummy_data.addr = 0;
+		struct am_ompt_stack_item result = {0, dummy_data};
+		return result;
+  }
+
+  td->call_stack.top--;
+
+  struct am_ompt_stack_item result = {
+      td->call_stack.stack[td->call_stack.top].tsc,
+      td->call_stack.stack[td->call_stack.top].data};
+
+  return result;
+}
+#endif
+
 static inline struct am_ompt_thread_data* am_get_thread_data() {
   struct am_ompt_thread_data* td;
 
   if (!(td = pthread_getspecific(am_thread_data_key))) {
+#ifdef SUPPORT_TRACE_CALLSTACK
+		return NULL; // As function entries may occur prior to thread data init
+#else
     fprintf(stderr, "Afterompt: Could not read thread data\n");
     // TODO: Dying may be too radical.
     exit(1);
+#endif
   }
 
   return td;
@@ -634,5 +684,75 @@ void am_callback_loop_chunk(ompt_data_t* parallel_data, ompt_data_t* task_data,
 
   CHECK_WRITE(am_dsk_openmp_loop_chunk_write_to_buffer_defid(&c->data, &lc))
 }
+
+#ifdef SUPPORT_TRACE_CALLSTACK
+
+/* If start_trace_signal == 1 then ensure tracing is enabled */
+void am_function_entry(void* addr, int start_trace_signal){
+
+	//fprintf(stdout, "Tracing entry to %p.\n", addr);
+
+	call_stack_tracing = (call_stack_tracing | start_trace_signal);
+
+	if(call_stack_tracing){
+
+		if(((uint64_t) addr) == 4201200)
+			return;
+
+		struct am_ompt_thread_data* td = am_get_thread_data();
+		if(td == NULL)
+			return;
+
+		union am_ompt_stack_item_data func_info;
+		func_info.addr = (uint64_t) addr;
+
+		am_ompt_push_call_stack_frame(td, am_ompt_now(), func_info);
+	}
+
+}
+
+/* If stop_trace_signal == 1 then trace the exit and disable further tracing */
+void am_function_exit(void* addr, int stop_trace_signal){
+	
+	//fprintf(stdout, "Tracing exit from %p.\n", addr);
+
+	if(call_stack_tracing == 0)
+		return;
+
+	if(((uint64_t) addr) == 4201200)
+		return;
+
+  struct am_ompt_thread_data* td = am_get_thread_data();
+	if(td == NULL)
+		return;
+
+  struct am_buffered_event_collection* c = td->event_collection;
+
+  struct am_ompt_stack_item frame = am_ompt_pop_call_stack_frame(td);
+	if(frame.data.addr == 0){
+		// then we are popping a frame that wasn't pushed
+		// i.e. the thread structures were not initialised when function entered
+		// we assume starting timestamp was 0
+		frame.data.addr = (uint64_t) addr;
+	}
+
+  struct am_dsk_interval interval = {frame.tsc, am_ompt_now()};
+
+  struct am_dsk_stack_frame t = {c->id, frame.data.addr, interval};
+
+  am_dsk_stack_frame_write_to_buffer_defid(&c->data, &t);
+
+	if(stop_trace_signal)
+		call_stack_tracing = 0;
+}
+
+void __cyg_profile_func_enter(void *func, void *caller){
+	am_function_entry(func, 1);
+}
+
+void __cyg_profile_func_exit(void *func, void *caller){
+	am_function_exit(func, 0);
+}
+#endif
 
 #pragma clang pop

@@ -27,6 +27,10 @@
 #define AM_OMPT_DEFAULT_EVENT_COLLECTION_BUFFER_SIZE (2 << 24)
 #define AM_OMPT_DEFAULT_MAX_STATE_STACK_ENTRIES 64
 
+#ifdef SUPPORT_TRACE_CALLSTACK
+	#define AM_OMPT_DEFAULT_MAX_CALL_STACK_ENTRIES 256
+#endif
+
 /* Application trace */
 extern struct am_buffered_trace am_ompt_trace;
 
@@ -46,16 +50,19 @@ union am_ompt_stack_item_data {
   uint32_t requested_parallelism;
   uint32_t actual_parallelism;
   uint64_t count;
+#ifdef SUPPORT_TRACE_CALLSTACK
+  uint64_t addr; 
+#endif
   struct am_ompt_loop_info loop_info;
 };
 
-/* Single stack element for tracing states containing intervals */
+/* Single stack element for tracing {states,functions} containing intervals */
 struct am_ompt_stack_item {
   am_timestamp_t tsc;
   union am_ompt_stack_item_data data;
 };
 
-/* Stack for tracing states containing intervals */
+/* Stack for tracing {states,functions} containing intervals */
 struct am_ompt_stack {
   struct am_ompt_stack_item* stack;
   uint32_t top;
@@ -65,6 +72,9 @@ struct am_ompt_stack {
 struct am_ompt_thread_data {
   struct am_buffered_event_collection* event_collection;
   struct am_ompt_stack state_stack;
+#ifdef SUPPORT_TRACE_CALLSTACK
+  struct am_ompt_stack call_stack;
+#endif
   pthread_t tid;
   uint32_t unique_counter;
 };
