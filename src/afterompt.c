@@ -33,6 +33,7 @@
 #include "afterompt.h"
 
 /* Time reference */
+static int tsref_set = 0;
 static struct am_timestamp_reference am_ompt_tsref;
 
 /* Pthread key to access thread tracing data */
@@ -41,6 +42,15 @@ static pthread_key_t am_thread_data_key;
 #ifdef SUPPORT_TRACE_CALLSTACK
 /* If 1, then we are within region of interest for function tracing */
 static int call_stack_tracing = 0;
+
+/* Before the multi-threaded constructs are built, all entries must be on
+ * a single CPU. So just push the entries here, and pop them on each
+ * function exit at the end 
+ */
+#define MAX_NUM_PRE_INIT_FN_ENTRIES 100
+static uint64_t initial_thread_fn_entry_times[MAX_NUM_PRE_INIT_FN_ENTRIES];
+static int num_pre_init_entries = 0;
+
 #endif
 
 ompt_set_callback_t am_set_callback;
@@ -129,7 +139,10 @@ int ompt_initialize(ompt_function_lookup_t lookup, int num, ompt_data_t* data) {
   REGISTER_CALLBACK(cancel);
 #endif
 
-  am_timestamp_reference_init(&am_ompt_tsref, am_timestamp_now());
+	if(tsref_set == 0){
+		am_timestamp_reference_init(&am_ompt_tsref, am_timestamp_now());
+		tsref_set = 1;
+	}
 
   am_ompt_init_trace();
 
@@ -690,18 +703,31 @@ void am_callback_loop_chunk(ompt_data_t* parallel_data, ompt_data_t* task_data,
 /* If start_trace_signal == 1 then ensure tracing is enabled */
 void am_function_entry(void* addr, int start_trace_signal){
 
-	//fprintf(stdout, "Tracing entry to %p.\n", addr);
-
 	call_stack_tracing = (call_stack_tracing | start_trace_signal);
 
 	if(call_stack_tracing){
 
+		// TODO should allow user to provide a file of blacklisted functions
 		if(((uint64_t) addr) == 4201200)
 			return;
 
 		struct am_ompt_thread_data* td = am_get_thread_data();
-		if(td == NULL)
+		if(td == NULL){
+			if(num_pre_init_entries >= MAX_NUM_PRE_INIT_FN_ENTRIES){
+				fprintf(stderr, "Maximum number of pre initialisation function entries \
+					reached.\n");	
+				exit(1);
+			}
+
+			if(tsref_set == 0){
+				am_timestamp_reference_init(&am_ompt_tsref, am_timestamp_now());
+				tsref_set = 1;
+			}
+
+			initial_thread_fn_entry_times[num_pre_init_entries] = am_ompt_now();
+			num_pre_init_entries++;
 			return;
+		}
 
 		union am_ompt_stack_item_data func_info;
 		func_info.addr = (uint64_t) addr;
@@ -713,30 +739,41 @@ void am_function_entry(void* addr, int start_trace_signal){
 
 /* If stop_trace_signal == 1 then trace the exit and disable further tracing */
 void am_function_exit(void* addr, int stop_trace_signal){
-	
-	//fprintf(stdout, "Tracing exit from %p.\n", addr);
 
 	if(call_stack_tracing == 0)
 		return;
 
+	// TODO should allow user to provide a file of blacklisted functions
 	if(((uint64_t) addr) == 4201200)
 		return;
 
   struct am_ompt_thread_data* td = am_get_thread_data();
-	if(td == NULL)
+	if(td == NULL){
+		// this probably shouldn't happen - we *left* a function before the
+		// afterompt constructs were initialised?
 		return;
+	}
 
   struct am_buffered_event_collection* c = td->event_collection;
+
+	uint64_t frame_start = 0;
 
   struct am_ompt_stack_item frame = am_ompt_pop_call_stack_frame(td);
 	if(frame.data.addr == 0){
 		// then we are popping a frame that wasn't pushed
 		// i.e. the thread structures were not initialised when function entered
-		// we assume starting timestamp was 0
+		// I must be the initial thread
+
+		// It is not possible for (num_pre_init_entries < 1) here
+		frame_start = initial_thread_fn_entry_times[num_pre_init_entries-1];
+		num_pre_init_entries--;
+
 		frame.data.addr = (uint64_t) addr;
+	} else {
+		frame_start = frame.tsc;
 	}
 
-  struct am_dsk_interval interval = {frame.tsc, am_ompt_now()};
+  struct am_dsk_interval interval = {frame_start, am_ompt_now()};
 
   struct am_dsk_stack_frame t = {c->id, frame.data.addr, interval};
 
