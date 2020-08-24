@@ -190,38 +190,38 @@ static int am_ompt_register_types() {
       am_dsk_hierarchy_node_write_default_id_to_buffer(&am_ompt_trace.data) ||
       am_dsk_event_collection_write_default_id_to_buffer(&am_ompt_trace.data) ||
       am_dsk_event_mapping_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_thread_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_parallel_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_implicit_task_write_default_id_to_buffer(
+      am_dsk_ompt_thread_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_ompt_parallel_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_ompt_implicit_task_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_task_create_write_default_id_to_buffer(
+      am_dsk_ompt_task_create_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_task_schedule_write_default_id_to_buffer(
+      am_dsk_ompt_task_schedule_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_sync_region_wait_write_default_id_to_buffer(
+      am_dsk_ompt_sync_region_wait_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_mutex_released_write_default_id_to_buffer(
+      am_dsk_ompt_mutex_released_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_dependences_write_default_id_to_buffer(
+      am_dsk_ompt_dependences_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_task_dependence_write_default_id_to_buffer(
+      am_dsk_ompt_task_dependence_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_work_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_master_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_sync_region_write_default_id_to_buffer(
+      am_dsk_ompt_work_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_ompt_master_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_ompt_sync_region_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_lock_init_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_lock_destroy_write_default_id_to_buffer(
+      am_dsk_ompt_lock_init_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_ompt_lock_destroy_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_mutex_acquire_write_default_id_to_buffer(
+      am_dsk_ompt_mutex_acquire_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_mutex_acquired_write_default_id_to_buffer(
+      am_dsk_ompt_mutex_acquired_write_default_id_to_buffer(
           &am_ompt_trace.data) ||
-      am_dsk_openmp_nest_lock_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_flush_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_cancel_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_loop_write_default_id_to_buffer(&am_ompt_trace.data) ||
-      am_dsk_openmp_loop_chunk_write_default_id_to_buffer(
+      am_dsk_ompt_nest_lock_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_ompt_flush_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_ompt_cancel_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_ompt_loop_write_default_id_to_buffer(&am_ompt_trace.data) ||
+      am_dsk_ompt_loop_chunk_write_default_id_to_buffer(
           &am_ompt_trace.data)) {
     return 1;
   }

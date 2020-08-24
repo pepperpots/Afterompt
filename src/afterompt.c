@@ -247,9 +247,9 @@ void am_callback_thread_end(ompt_data_t* data) {
 
   struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-  struct am_dsk_openmp_thread t = {c->id, interval, state.data.thread_type};
+  struct am_dsk_ompt_thread t = {c->id, interval, state.data.thread_type};
 
-  CHECK_WRITE(am_dsk_openmp_thread_write_to_buffer_defid(&c->data, &t))
+  CHECK_WRITE(am_dsk_ompt_thread_write_to_buffer_defid(&c->data, &t))
 
   am_ompt_destroy_thread_data(td);
 }
@@ -278,10 +278,10 @@ void am_callback_parallel_end(ompt_data_t* parallel_data,
 
   struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-  struct am_dsk_openmp_parallel p = {c->id, interval,
+  struct am_dsk_ompt_parallel p = {c->id, interval,
                                      state.data.requested_parallelism, flags};
 
-  CHECK_WRITE(am_dsk_openmp_parallel_write_to_buffer_defid(&c->data, &p))
+  CHECK_WRITE(am_dsk_ompt_parallel_write_to_buffer_defid(&c->data, &p))
 }
 
 void am_callback_task_create(ompt_data_t* task_data,
@@ -296,11 +296,11 @@ void am_callback_task_create(ompt_data_t* task_data,
 
   uint64_t current_task_id = (task_data == NULL) ? 0 : task_data->value;
 
-  struct am_dsk_openmp_task_create tc = {
+  struct am_dsk_ompt_task_create tc = {
       c->id, am_ompt_now(),   current_task_id,    new_task_data->value,
       flags, has_dependences, (uint64_t)codeptr_ra};
 
-  CHECK_WRITE(am_dsk_openmp_task_create_write_to_buffer_defid(&c->data, &tc))
+  CHECK_WRITE(am_dsk_ompt_task_create_write_to_buffer_defid(&c->data, &tc))
 }
 
 void am_callback_task_schedule(ompt_data_t* prior_task_data,
@@ -309,11 +309,11 @@ void am_callback_task_schedule(ompt_data_t* prior_task_data,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_task_schedule ts = {
+  struct am_dsk_ompt_task_schedule ts = {
       c->id, am_ompt_now(), prior_task_data->value, next_task_data->value,
       prior_task_status};
 
-  CHECK_WRITE(am_dsk_openmp_task_schedule_write_to_buffer_defid(&c->data, &ts))
+  CHECK_WRITE(am_dsk_ompt_task_schedule_write_to_buffer_defid(&c->data, &ts))
 }
 
 void am_callback_implicit_task(ompt_scope_endpoint_t endpoint,
@@ -337,10 +337,10 @@ void am_callback_implicit_task(ompt_scope_endpoint_t endpoint,
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-    struct am_dsk_openmp_implicit_task it = {
+    struct am_dsk_ompt_implicit_task it = {
         c->id, interval, state.data.actual_parallelism, flags};
 
-    CHECK_WRITE(am_dsk_openmp_implicit_task_write_to_buffer_defid(&c->data, &it))
+    CHECK_WRITE(am_dsk_ompt_implicit_task_write_to_buffer_defid(&c->data, &it))
   }
 }
 
@@ -364,9 +364,9 @@ void am_callback_sync_region_wait(ompt_sync_region_t kind,
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-    struct am_dsk_openmp_sync_region_wait srw = {c->id, interval, kind};
+    struct am_dsk_ompt_sync_region_wait srw = {c->id, interval, kind};
 
-    CHECK_WRITE(am_dsk_openmp_sync_region_wait_write_to_buffer_defid(&c->data, &srw))
+    CHECK_WRITE(am_dsk_ompt_sync_region_wait_write_to_buffer_defid(&c->data, &srw))
   }
 }
 
@@ -376,10 +376,10 @@ void am_callback_mutex_released(ompt_mutex_t kind, ompt_wait_id_t wait_id,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_mutex_released mr = {c->id, am_ompt_now(), wait_id,
+  struct am_dsk_ompt_mutex_released mr = {c->id, am_ompt_now(), wait_id,
                                             kind};
 
-  CHECK_WRITE(am_dsk_openmp_mutex_released_write_to_buffer_defid(&c->data, &mr))
+  CHECK_WRITE(am_dsk_ompt_mutex_released_write_to_buffer_defid(&c->data, &mr))
 }
 
 void am_callback_dependences(ompt_data_t* task_data,
@@ -390,9 +390,9 @@ void am_callback_dependences(ompt_data_t* task_data,
 
   // TODO: We could collect more information here by traversing the deps
   //       list to get the storage location of dependences.
-  struct am_dsk_openmp_dependences d = {c->id, am_ompt_now(), ndeps};
+  struct am_dsk_ompt_dependences d = {c->id, am_ompt_now(), ndeps};
 
-  CHECK_WRITE(am_dsk_openmp_dependences_write_to_buffer_defid(&c->data, &d))
+  CHECK_WRITE(am_dsk_ompt_dependences_write_to_buffer_defid(&c->data, &d))
 }
 
 void am_callback_task_dependence(ompt_data_t* src_task_data,
@@ -400,10 +400,10 @@ void am_callback_task_dependence(ompt_data_t* src_task_data,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_task_dependence td = {
+  struct am_dsk_ompt_task_dependence td = {
       c->id, am_ompt_now(), src_task_data->value, sink_task_data->value};
 
-  CHECK_WRITE(am_dsk_openmp_task_dependence_write_to_buffer_defid(&c->data, &td))
+  CHECK_WRITE(am_dsk_ompt_task_dependence_write_to_buffer_defid(&c->data, &td))
 }
 
 void am_callback_work(ompt_work_t wstype, ompt_scope_endpoint_t endpoint,
@@ -426,9 +426,9 @@ void am_callback_work(ompt_work_t wstype, ompt_scope_endpoint_t endpoint,
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-    struct am_dsk_openmp_work w = {c->id, interval, wstype, state.data.count};
+    struct am_dsk_ompt_work w = {c->id, interval, wstype, state.data.count};
 
-    CHECK_WRITE(am_dsk_openmp_work_write_to_buffer_defid(&c->data, &w))
+    CHECK_WRITE(am_dsk_ompt_work_write_to_buffer_defid(&c->data, &w))
   }
 }
 
@@ -450,9 +450,9 @@ void am_callback_master(ompt_scope_endpoint_t endpoint,
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-    struct am_dsk_openmp_master m = {c->id, interval};
+    struct am_dsk_ompt_master m = {c->id, interval};
 
-    CHECK_WRITE(am_dsk_openmp_master_write_to_buffer_defid(&c->data, &m))
+    CHECK_WRITE(am_dsk_ompt_master_write_to_buffer_defid(&c->data, &m))
   }
 }
 
@@ -474,9 +474,9 @@ void am_callback_sync_region(ompt_sync_region_t kind,
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-    struct am_dsk_openmp_sync_region sr = {c->id, interval, kind};
+    struct am_dsk_ompt_sync_region sr = {c->id, interval, kind};
 
-    CHECK_WRITE(am_dsk_openmp_sync_region_write_to_buffer_defid(&c->data, &sr))
+    CHECK_WRITE(am_dsk_ompt_sync_region_write_to_buffer_defid(&c->data, &sr))
   }
 }
 
@@ -486,9 +486,9 @@ void am_callback_lock_init(ompt_mutex_t kind, ompt_wait_id_t wait_id,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_lock_init li = {c->id, am_ompt_now(), wait_id, kind};
+  struct am_dsk_ompt_lock_init li = {c->id, am_ompt_now(), wait_id, kind};
 
-  CHECK_WRITE(am_dsk_openmp_lock_init_write_to_buffer_defid(&c->data, &li))
+  CHECK_WRITE(am_dsk_ompt_lock_init_write_to_buffer_defid(&c->data, &li))
 }
 
 void am_callback_lock_destroy(ompt_mutex_t kind, ompt_wait_id_t wait_id,
@@ -497,9 +497,9 @@ void am_callback_lock_destroy(ompt_mutex_t kind, ompt_wait_id_t wait_id,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_lock_destroy ld = {c->id, am_ompt_now(), wait_id, kind};
+  struct am_dsk_ompt_lock_destroy ld = {c->id, am_ompt_now(), wait_id, kind};
 
-  CHECK_WRITE(am_dsk_openmp_lock_destroy_write_to_buffer_defid(&c->data, &ld))
+  CHECK_WRITE(am_dsk_ompt_lock_destroy_write_to_buffer_defid(&c->data, &ld))
 }
 
 void am_callback_mutex_acquire(ompt_mutex_t kind, unsigned int hint,
@@ -509,10 +509,10 @@ void am_callback_mutex_acquire(ompt_mutex_t kind, unsigned int hint,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_mutex_acquire ma = {c->id, am_ompt_now(), wait_id,
+  struct am_dsk_ompt_mutex_acquire ma = {c->id, am_ompt_now(), wait_id,
                                            kind,  hint,          impl};
 
-  CHECK_WRITE(am_dsk_openmp_mutex_acquire_write_to_buffer_defid(&c->data, &ma))
+  CHECK_WRITE(am_dsk_ompt_mutex_acquire_write_to_buffer_defid(&c->data, &ma))
 }
 
 void am_callback_mutex_acquired(ompt_mutex_t kind, ompt_wait_id_t wait_id,
@@ -521,10 +521,10 @@ void am_callback_mutex_acquired(ompt_mutex_t kind, ompt_wait_id_t wait_id,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_mutex_acquired ma = {c->id, am_ompt_now(), wait_id,
+  struct am_dsk_ompt_mutex_acquired ma = {c->id, am_ompt_now(), wait_id,
                                             kind};
 
-  CHECK_WRITE(am_dsk_openmp_mutex_acquired_write_to_buffer_defid(&c->data, &ma))
+  CHECK_WRITE(am_dsk_ompt_mutex_acquired_write_to_buffer_defid(&c->data, &ma))
 }
 
 void am_callback_nest_lock(ompt_scope_endpoint_t endpoint,
@@ -542,9 +542,9 @@ void am_callback_nest_lock(ompt_scope_endpoint_t endpoint,
 
     struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-    struct am_dsk_openmp_nest_lock nl = {c->id, interval, wait_id};
+    struct am_dsk_ompt_nest_lock nl = {c->id, interval, wait_id};
 
-    CHECK_WRITE(am_dsk_openmp_nest_lock_write_to_buffer_defid(&c->data, &nl))
+    CHECK_WRITE(am_dsk_ompt_nest_lock_write_to_buffer_defid(&c->data, &nl))
   }
 }
 
@@ -553,9 +553,9 @@ void am_callback_flush(ompt_data_t* thread_data, const void* codeptr_ra) {
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_flush f = {c->id, am_ompt_now()};
+  struct am_dsk_ompt_flush f = {c->id, am_ompt_now()};
 
-  CHECK_WRITE(am_dsk_openmp_flush_write_to_buffer_defid(&c->data, &f))
+  CHECK_WRITE(am_dsk_ompt_flush_write_to_buffer_defid(&c->data, &f))
 }
 
 void am_callback_cancel(ompt_data_t* task_data, int flags,
@@ -565,9 +565,9 @@ void am_callback_cancel(ompt_data_t* task_data, int flags,
   struct am_buffered_event_collection* c =
       am_get_thread_data()->event_collection;
 
-  struct am_dsk_openmp_cancel cc = {c->id, am_ompt_now(), flags};
+  struct am_dsk_ompt_cancel cc = {c->id, am_ompt_now(), flags};
 
-  CHECK_WRITE(am_dsk_openmp_cancel_write_to_buffer_defid(&c->data, &cc))
+  CHECK_WRITE(am_dsk_ompt_cancel_write_to_buffer_defid(&c->data, &cc))
 }
 
 void am_callback_loop_begin(ompt_data_t* parallel_data, ompt_data_t* task_data,
@@ -599,7 +599,7 @@ void am_callback_loop_end(ompt_data_t* parallel_data, ompt_data_t* task_data) {
 
   struct am_dsk_interval interval = {state.tsc, am_ompt_now()};
 
-  struct am_dsk_openmp_loop l = {c->id,
+  struct am_dsk_ompt_loop l = {c->id,
                                  interval,
                                  task_data->value,
                                  loop_info.flags,
@@ -609,16 +609,15 @@ void am_callback_loop_end(ompt_data_t* parallel_data, ompt_data_t* task_data) {
                                  loop_info.num_workers,
                                  loop_info.codeptr_ra};
 
-  CHECK_WRITE(am_dsk_openmp_loop_write_to_buffer_defid(&c->data, &l))
+  CHECK_WRITE(am_dsk_ompt_loop_write_to_buffer_defid(&c->data, &l))
 
   /* We need a marker in the trace to close the last period in the loop. Not
      sure it is the best solution, so probably it needs to be revisited. */
   // TODO: Revisit this later.
-  struct am_dsk_openmp_loop_chunk lc = {c->id, am_ompt_now(), task_data->value,
+  struct am_dsk_ompt_loop_chunk lc = {c->id, am_ompt_now(), task_data->value,
                                         0, 0, 1};
 
-  CHECK_WRITE(am_dsk_openmp_loop_chunk_write_to_buffer_defid(&c->data, &lc))
-
+  CHECK_WRITE(am_dsk_ompt_loop_chunk_write_to_buffer_defid(&c->data, &lc))
 }
 
 void am_callback_loop_chunk(ompt_data_t* parallel_data, ompt_data_t* task_data,
@@ -629,10 +628,10 @@ void am_callback_loop_chunk(ompt_data_t* parallel_data, ompt_data_t* task_data,
   /* Zero indicates that it is not the end of the last period. This should be
      treated as a small hack, since maybe there is a better solution. */
   // TODO: Revisit this later.
-  struct am_dsk_openmp_loop_chunk lc = {c->id, am_ompt_now(), task_data->value,
+  struct am_dsk_ompt_loop_chunk lc = {c->id, am_ompt_now(), task_data->value,
                                         lower_bound, upper_bound, 0};
 
-  CHECK_WRITE(am_dsk_openmp_loop_chunk_write_to_buffer_defid(&c->data, &lc))
+  CHECK_WRITE(am_dsk_ompt_loop_chunk_write_to_buffer_defid(&c->data, &lc))
 }
 
 #pragma clang pop
