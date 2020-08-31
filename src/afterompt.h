@@ -28,6 +28,9 @@ ompt_start_tool_result_t* ompt_start_tool(unsigned int omp_version,
 /* Tool initialization */
 int ompt_initialize(ompt_function_lookup_t lookup, int num, ompt_data_t* data);
 
+/* Initialize the data structures - this may be called by user application */
+void initialize_tracing_data_structures();
+
 /* Tool clean up */
 void ompt_finalize(ompt_data_t* data);
 
@@ -133,7 +136,7 @@ void am_function_exit(void* addr, int stop_trace_signal);
 */
 
 void __cyg_profile_func_enter(void *func,  void *caller)
-	 __attribute__((no_instrument_function));
+   __attribute__((no_instrument_function));
 
 void __cyg_profile_func_exit(void *func,  void *caller)
-	 __attribute__((no_instrument_function));
+   __attribute__((no_instrument_function));

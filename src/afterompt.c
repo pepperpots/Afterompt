@@ -36,6 +36,9 @@
 static int tsref_set = 0;
 static struct am_timestamp_reference am_ompt_tsref;
 
+pthread_t main_thread = NULL;
+static int data_structures_initialized = 0;
+
 /* Pthread key to access thread tracing data */
 static pthread_key_t am_thread_data_key;
 
@@ -47,7 +50,7 @@ static int call_stack_tracing = 0;
  * a single CPU. So just push the entries here, and pop them on each
  * function exit at the end 
  */
-#define MAX_NUM_PRE_INIT_FN_ENTRIES 100
+#define MAX_NUM_PRE_INIT_FN_ENTRIES 10000
 static uint64_t initial_thread_fn_entry_times[MAX_NUM_PRE_INIT_FN_ENTRIES];
 static int num_pre_init_entries = 0;
 
@@ -139,21 +142,45 @@ int ompt_initialize(ompt_function_lookup_t lookup, int num, ompt_data_t* data) {
   REGISTER_CALLBACK(cancel);
 #endif
 
-	if(tsref_set == 0){
-		am_timestamp_reference_init(&am_ompt_tsref, am_timestamp_now());
-		tsref_set = 1;
-	}
-
-  am_ompt_init_trace();
-
-  if (pthread_key_create(&am_thread_data_key, NULL)) {
-    fprintf(stderr, "Afterompt: Failed to create thread data key.\n");
-    /* Zero means failure */
-    return 0;
-  }
+  initialize_tracing_data_structures();
 
   /* In this context non-zero means success */
   return 1;
+}
+
+void initialize_tracing_data_structures(){
+
+  if(tsref_set == 0){
+    am_timestamp_reference_init(&am_ompt_tsref, am_timestamp_now());
+    tsref_set = 1;
+  }
+
+  if(data_structures_initialized == 0){
+
+    fprintf(stdout, "data structures initialized!\n");
+
+    am_ompt_init_trace();
+
+    if (pthread_key_create(&am_thread_data_key, NULL)) {
+      fprintf(stderr, "Afterompt: Failed to create thread data key.\n");
+      /* Zero means failure */
+      return 0;
+    }
+
+    struct am_ompt_thread_data* td;
+
+    main_thread = pthread_self();
+    if (!(td = am_ompt_create_thread_data(main_thread))) {
+      fprintf(stderr, "Afterompt: Could not create thread data\n");
+      // TODO: Dying may be too radical.
+      exit(1);
+    }
+
+    pthread_setspecific(am_thread_data_key, td);
+
+    data_structures_initialized = 1;
+  }
+
 }
 
 void ompt_finalize(ompt_data_t* data) {
@@ -238,14 +265,14 @@ static inline void am_ompt_push_call_stack_frame(struct am_ompt_thread_data* td,
 static inline struct am_ompt_stack_item am_ompt_pop_call_stack_frame(
     struct am_ompt_thread_data* td) {
 
-	// We may have entered a function before the am thread data structures were set up
-	// meaning we didn't push it to any stack
-	// So we expect to fail the pop
+  // We may have entered a function before the am thread data structures were set up
+  // meaning we didn't push it to any stack
+  // So we expect to fail the pop
   if (td->call_stack.top == 0) {
-		union am_ompt_stack_item_data dummy_data;
-		dummy_data.addr = 0;
-		struct am_ompt_stack_item result = {0, dummy_data};
-		return result;
+    union am_ompt_stack_item_data dummy_data;
+    dummy_data.addr = 0;
+    struct am_ompt_stack_item result = {0, dummy_data};
+    return result;
   }
 
   td->call_stack.top--;
@@ -263,7 +290,7 @@ static inline struct am_ompt_thread_data* am_get_thread_data() {
 
   if (!(td = pthread_getspecific(am_thread_data_key))) {
 #ifdef SUPPORT_TRACE_CALLSTACK
-		return NULL; // As function entries may occur prior to thread data init
+    return NULL; // As function entries may occur prior to thread data init
 #else
     fprintf(stderr, "Afterompt: Could not read thread data\n");
     // TODO: Dying may be too radical.
@@ -287,10 +314,14 @@ static inline struct am_ompt_thread_data* am_get_thread_data() {
 void am_callback_thread_begin(ompt_thread_t type, ompt_data_t* data) {
   struct am_ompt_thread_data* td;
 
-  if (!(td = am_ompt_create_thread_data(pthread_self()))) {
-    fprintf(stderr, "Afterompt: Could not create thread data\n");
-    // TODO: Dying may be too radical.
-    exit(1);
+  if(pthread_self() != main_thread){
+    if (!(td = am_ompt_create_thread_data(pthread_self()))) {
+      fprintf(stderr, "Afterompt: Could not create thread data\n");
+      // TODO: Dying may be too radical.
+      exit(1);
+    }
+  } else {
+    td = am_get_thread_data();
   }
 
   // TODO: Use initialization list.
@@ -703,75 +734,71 @@ void am_callback_loop_chunk(ompt_data_t* parallel_data, ompt_data_t* task_data,
 /* If start_trace_signal == 1 then ensure tracing is enabled */
 void am_function_entry(void* addr, int start_trace_signal){
 
-	call_stack_tracing = (call_stack_tracing | start_trace_signal);
+  call_stack_tracing = (call_stack_tracing | start_trace_signal);
 
-	if(call_stack_tracing){
+  if(call_stack_tracing){
 
-		// TODO should allow user to provide a file of blacklisted functions
-		if(((uint64_t) addr) == 4201200)
-			return;
+    // TODO should allow user to provide a file of blacklisted functions
 
-		struct am_ompt_thread_data* td = am_get_thread_data();
-		if(td == NULL){
-			if(num_pre_init_entries >= MAX_NUM_PRE_INIT_FN_ENTRIES){
-				fprintf(stderr, "Maximum number of pre initialisation function entries \
-					reached.\n");	
-				exit(1);
-			}
+    struct am_ompt_thread_data* td = am_get_thread_data();
+    if(td == NULL){
+      if(tsref_set == 0){
+        am_timestamp_reference_init(&am_ompt_tsref, am_timestamp_now());
+        tsref_set = 1;
+      }
+      
+      if(num_pre_init_entries >= MAX_NUM_PRE_INIT_FN_ENTRIES){
+        fprintf(stderr, "Maximum number of pre initialisation function entries \
+          reached.\n");  
+        exit(1);
+      }
 
-			if(tsref_set == 0){
-				am_timestamp_reference_init(&am_ompt_tsref, am_timestamp_now());
-				tsref_set = 1;
-			}
+      initial_thread_fn_entry_times[num_pre_init_entries] = am_ompt_now();
+      num_pre_init_entries++;
+      return;
+    }
 
-			initial_thread_fn_entry_times[num_pre_init_entries] = am_ompt_now();
-			num_pre_init_entries++;
-			return;
-		}
+    union am_ompt_stack_item_data func_info;
+    func_info.addr = (uint64_t) addr;
 
-		union am_ompt_stack_item_data func_info;
-		func_info.addr = (uint64_t) addr;
-
-		am_ompt_push_call_stack_frame(td, am_ompt_now(), func_info);
-	}
+    am_ompt_push_call_stack_frame(td, am_ompt_now(), func_info);
+  }
 
 }
 
 /* If stop_trace_signal == 1 then trace the exit and disable further tracing */
 void am_function_exit(void* addr, int stop_trace_signal){
 
-	if(call_stack_tracing == 0)
-		return;
+  if(call_stack_tracing == 0)
+    return;
 
-	// TODO should allow user to provide a file of blacklisted functions
-	if(((uint64_t) addr) == 4201200)
-		return;
+  // TODO should allow user to provide a file of blacklisted functions
 
   struct am_ompt_thread_data* td = am_get_thread_data();
-	if(td == NULL){
-		// this probably shouldn't happen - we *left* a function before the
-		// afterompt constructs were initialised?
-		return;
-	}
+  if(td == NULL){
+    // this probably shouldn't happen - we *left* a function before the
+    // afterompt constructs were initialised?
+    fprintf(stderr, "Not recording the exit for stack frame %lu\n", (uint64_t) addr);
+    return;
+  }
 
   struct am_buffered_event_collection* c = td->event_collection;
 
-	uint64_t frame_start = 0;
+  uint64_t frame_start = 0;
 
   struct am_ompt_stack_item frame = am_ompt_pop_call_stack_frame(td);
-	if(frame.data.addr == 0){
-		// then we are popping a frame that wasn't pushed
-		// i.e. the thread structures were not initialised when function entered
-		// I must be the initial thread
+  if(frame.data.addr == 0){
+    // Then we are popping a frame that wasn't pushed
+    // i.e. the thread structures were not initialised when function entered
 
-		// It is not possible for (num_pre_init_entries < 1) here
-		frame_start = initial_thread_fn_entry_times[num_pre_init_entries-1];
-		num_pre_init_entries--;
+    // It is not possible for (num_pre_init_entries < 1) here
+    frame_start = initial_thread_fn_entry_times[num_pre_init_entries-1];
+    num_pre_init_entries--;
 
-		frame.data.addr = (uint64_t) addr;
-	} else {
-		frame_start = frame.tsc;
-	}
+    frame.data.addr = (uint64_t) addr;
+  } else {
+    frame_start = frame.tsc;
+  }
 
   struct am_dsk_interval interval = {frame_start, am_ompt_now()};
 
@@ -779,16 +806,16 @@ void am_function_exit(void* addr, int stop_trace_signal){
 
   am_dsk_stack_frame_write_to_buffer_defid(&c->data, &t);
 
-	if(stop_trace_signal)
-		call_stack_tracing = 0;
+  if(stop_trace_signal)
+    call_stack_tracing = 0;
 }
 
 void __cyg_profile_func_enter(void *func, void *caller){
-	am_function_entry(func, 1);
+  am_function_entry(func, 1);
 }
 
 void __cyg_profile_func_exit(void *func, void *caller){
-	am_function_exit(func, 0);
+  am_function_exit(func, 0);
 }
 #endif
 
