@@ -119,32 +119,32 @@ core buffer in bytes.
 Currently AfterOMPT traces the following states and events:
 
 ```
-openmp_thread,
-openmp_parallel,
-openmp_task_create,
-openmp_task_schedule,
-openmp_implicit_task,
-openmp_sync_region_wait,
-openmp_mutex_released,
-openmp_dependences,
-openmp_task_dependence,
-openmp_work,
-openmp_master,
-openmp_sync_region,
-openmp_lock_init,
-openmp_lock_destroy,
-openmp_mutex_acquire,
-openmp_mutex_acquired,
-openmp_nest_lock,
-openmp_flush,
-openmp_cancel
+ompt_thread,
+ompt_parallel,
+ompt_task_create,
+ompt_task_schedule,
+ompt_implicit_task,
+ompt_sync_region_wait,
+ompt_mutex_released,
+ompt_dependences,
+ompt_task_dependence,
+ompt_work,
+ompt_master,
+ompt_sync_region,
+ompt_lock_init,
+ompt_lock_destroy,
+ompt_mutex_acquire,
+ompt_mutex_acquired,
+ompt_nest_lock,
+ompt_flush,
+ompt_cancel
 ```
 
 Additional two are provided by experimental non-standard callbacks:
 
 ```
-openmp_loop
-openmp_loop_chunk
+ompt_loop
+ompt_loop_chunk
 ```
 
 Detailed information about data attached to each state
@@ -223,7 +223,14 @@ The library was successfully used with following versions of the software:
 To cite this project please use the following BibTeX entry:
 
 ```
-Work-in-progress
+@inproceedings{wodiany2020afterompt,
+  title={AfterOMPT: An OMPT-Based Tool for Fine-Grained Tracing of Tasks and Loops},
+  author={Wodiany, Igor and Drebes, Andi and Neill, Richard and Pop, Antoniu},
+  booktitle={International Workshop on OpenMP},
+  pages={165--180},
+  year={2020},
+  organization={Springer}
+}
 ```
 
 ## Contributors
