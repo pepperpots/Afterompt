@@ -74,7 +74,13 @@ If the `ompt.h` header cannot be found by the compiler, its location should be
 added to the include path:
 
 ```
-export C_INCLUDE_PATH="/home/iwodiany/Projects/llvm-project/openmp/build/instal/usr/local/include"
+export C_INCLUDE_PATH="<path-to-ompt-header>"
+```
+
+When using a locally built OpenMP runtime this usually is:
+
+```
+export C_INCLUDE_PATH="<openmp-install-dir>/usr/local/include"
 ```
 
 ## Usage
