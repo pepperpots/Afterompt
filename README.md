@@ -2,7 +2,7 @@
 
 AfterOMPT is a library that implements [OMPT](https://www.openmp.org/specifications/)
 callbacks to collect dynamic events from OpenMP applications, and to write
-them to a trace file using the [Aftermath](https://www.aftermath-tracing.com/)
+them to a trace file using the [Aftermath](https://github.com/pepperpots/aftermath)
 tracing API.
 
 ## Download
@@ -15,10 +15,9 @@ git clone https://github.com/pepperpots/Afterompt.git
 
 ## Dependencies
 
-The only dependency for the project is [Aftermath](https://www.aftermath-tracing.com/).
-The support for the OMPT events has not been merged into the main repository yet,
-however the required code can be found in our development fork in [here](https://github.com/pepperpots/aftermath)
-(branch: afterompt-support).
+The only dependency for the project is [Aftermath](https://github.com/pepperpots/aftermath).
+The support for the OMPT events has not been merged into the mater branch yet,
+however the required code can be found on the development branch [afterompt-support](https://github.com/pepperpots/aftermath/tree/afterompt-support).
 
 To enable loops tracing that relay on experimental callbacks modified versions of
 Aftermath, LLVM OpenMP runtime and Clang are needed. All details can be found in
@@ -28,7 +27,7 @@ Aftermath, LLVM OpenMP runtime and Clang are needed. All details can be found in
 
 Before running any commands please ensure that a required version of Aftermath
 has been built. For the building instruction please refer to the
-[official website](https://www.aftermath-tracing.com/prerelease/).
+[Aftermath build instruction](https://github.com/pepperpots/aftermath/tree/afterompt-support).
 
 It is assumed that the OMPT compatible OpenMP runtime is already installed in the
 system. If not runtime is present we recommend building and installing the
