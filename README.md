@@ -16,8 +16,6 @@ git clone https://github.com/pepperpots/Afterompt.git
 ## Dependencies
 
 The only dependency for the project is [Aftermath](https://github.com/pepperpots/aftermath).
-The support for the OMPT events has not been merged into the mater branch yet,
-however the required code can be found on the development branch [afterompt-support](https://github.com/pepperpots/aftermath/tree/afterompt-support).
 
 To enable loops tracing that relay on experimental callbacks modified versions of
 Aftermath, LLVM OpenMP runtime and Clang are needed. All details can be found in
@@ -27,7 +25,7 @@ Aftermath, LLVM OpenMP runtime and Clang are needed. All details can be found in
 
 Before running any commands please ensure that a required version of Aftermath
 has been built. For the building instruction please refer to the
-[Aftermath build instruction](https://github.com/pepperpots/aftermath/tree/afterompt-support).
+[Aftermath build instruction](https://github.com/pepperpots/aftermath/).
 
 It is assumed that the OMPT compatible OpenMP runtime is already installed in the
 system. If not runtime is present we recommend building and installing the
@@ -225,16 +223,18 @@ The library was successfully used with following versions of the software:
 
 ## Publications
 
-To cite this project please use the following BibTeX entry:
+To cite this project please use our IWOMP 2020 paper, e.g.
 
 ```
 @inproceedings{wodiany2020afterompt,
   title={AfterOMPT: An OMPT-Based Tool for Fine-Grained Tracing of Tasks and Loops},
   author={Wodiany, Igor and Drebes, Andi and Neill, Richard and Pop, Antoniu},
-  booktitle={International Workshop on OpenMP},
+  booktitle={OpenMP: Portable Multi-Level Parallelism on Modern Systems},
   pages={165--180},
   year={2020},
-  organization={Springer}
+  organization={Springer International Publishing},
+  address={Cham},
+  doi={10.1007/978-3-030-58144-2_11}
 }
 ```
 
