@@ -43,16 +43,28 @@ static int data_structures_initialized = 0;
 static pthread_key_t am_thread_data_key;
 
 #ifdef SUPPORT_TRACE_CALLSTACK
-/* If 1, then we are within region of interest for function tracing */
-static int call_stack_tracing = 0;
 
-/* Before the multi-threaded constructs are built, all entries must be on
- * a single CPU. So just push the entries here, and pop them on each
- * function exit at the end 
- */
-#define MAX_NUM_PRE_INIT_FN_ENTRIES 10000
-static uint64_t initial_thread_fn_entry_times[MAX_NUM_PRE_INIT_FN_ENTRIES];
-static int num_pre_init_entries = 0;
+	/* If 1, then we are within region of interest for function tracing */
+	static int call_stack_tracing = 0;
+
+	/* Before the multi-threaded constructs are built, all entries must be on
+	 * a single CPU. So just push the entries here, and pop them on each
+	 * function exit at the end 
+	 * TODO this should be allocated on the heap and resized dynamically
+	 */
+	#define MAX_NUM_PRE_INIT_FN_ENTRIES 10000
+	static uint64_t initial_thread_fn_entry_times[MAX_NUM_PRE_INIT_FN_ENTRIES];
+	static int num_pre_init_entries = 0;
+
+	#ifdef EXCLUDE_SHORT_FUNCTIONS
+
+		// TODO this array should be allocated on the heap and resized dynamically
+		#define MAX_NUM_EXCLUSIONS 100
+		#define EXCLUSION_DURATION 200
+		static uint64_t excluded_functions_arr[MAX_NUM_EXCLUSIONS];
+		static int num_excluded_functions = 0;
+
+	#endif
 
 #endif
 
@@ -164,7 +176,7 @@ void initialize_tracing_data_structures(){
     if (pthread_key_create(&am_thread_data_key, NULL)) {
       fprintf(stderr, "Afterompt: Failed to create thread data key.\n");
       /* Zero means failure */
-      return 0;
+      return;
     }
 
     struct am_ompt_thread_data* td;
@@ -180,6 +192,10 @@ void initialize_tracing_data_structures(){
 
     data_structures_initialized = 1;
   }
+
+#ifdef EXCLUDE_SHORT_FUNCTIONS
+	num_excluded_functions = 0;
+#endif
 
 }
 
@@ -734,9 +750,19 @@ void am_callback_loop_chunk(ompt_data_t* parallel_data, ompt_data_t* task_data,
 /* If start_trace_signal == 1 then ensure tracing is enabled */
 void am_function_entry(void* addr, int start_trace_signal){
 
+#ifdef EXCLUDE_SHORT_FUNCTIONS
+	// Check if the function is already excluded
+	for(unsigned int i=0; i<num_excluded_functions; i++){
+		if(excluded_functions_arr[i] == (uint64_t) addr)
+			return;
+	}
+#endif
+
+	/*
   call_stack_tracing = (call_stack_tracing | start_trace_signal);
 
   if(call_stack_tracing){
+	*/
 
     // TODO should allow user to provide a file of blacklisted functions
 
@@ -762,15 +788,25 @@ void am_function_entry(void* addr, int start_trace_signal){
     func_info.addr = (uint64_t) addr;
 
     am_ompt_push_call_stack_frame(td, am_ompt_now(), func_info);
-  }
+  //}
 
 }
 
 /* If stop_trace_signal == 1 then trace the exit and disable further tracing */
 void am_function_exit(void* addr, int stop_trace_signal){
 
+	/*
   if(call_stack_tracing == 0)
     return;
+	*/
+
+#ifdef EXCLUDE_SHORT_FUNCTIONS
+	// Check if the function is already excluded
+	for(unsigned int i=0; i<num_excluded_functions; i++){
+		if(excluded_functions_arr[i] == (uint64_t) addr)
+			return;
+	}
+#endif
 
   // TODO should allow user to provide a file of blacklisted functions
 
@@ -785,6 +821,7 @@ void am_function_exit(void* addr, int stop_trace_signal){
   struct am_buffered_event_collection* c = td->event_collection;
 
   uint64_t frame_start = 0;
+	uint64_t frame_end = am_ompt_now();
 
   struct am_ompt_stack_item frame = am_ompt_pop_call_stack_frame(td);
   if(frame.data.addr == 0){
@@ -800,14 +837,39 @@ void am_function_exit(void* addr, int stop_trace_signal){
     frame_start = frame.tsc;
   }
 
-  struct am_dsk_interval interval = {frame_start, am_ompt_now()};
+#ifdef EXCLUDE_SHORT_FUNCTIONS
+
+	// Check if the function should be excluded
+	if((frame_end - frame_start) <= EXCLUSION_DURATION){
+
+		fprintf(stdout, "Excluding the tracing of function %lu\n", (uint64_t) addr);
+
+		if(num_excluded_functions == MAX_NUM_EXCLUSIONS){
+			fprintf(stderr, "Ran out of exclusion space. Aborting.\n");
+			exit(1);
+		}
+
+		excluded_functions_arr[num_excluded_functions] = (uint64_t) addr;
+		num_excluded_functions++;
+		return;
+	}
+	// TODO this needs improved:
+	// - if only one stack frame is short, and the rest are super long, they will all be excluded
+	// - if the short stack frame is later, we will record some of the function calls but not all of them
+	//   and the user will never know that the trace information is incomplete
+
+#endif
+  
+	struct am_dsk_interval interval = {frame_start, frame_end};
 
   struct am_dsk_stack_frame t = {c->id, frame.data.addr, interval};
 
   am_dsk_stack_frame_write_to_buffer_defid(&c->data, &t);
 
+	/*
   if(stop_trace_signal)
     call_stack_tracing = 0;
+	*/
 }
 
 void __cyg_profile_func_enter(void *func, void *caller){
